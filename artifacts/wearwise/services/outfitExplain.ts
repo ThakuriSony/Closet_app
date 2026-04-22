@@ -1,5 +1,5 @@
 import type { GeneratedOutfit, Occasion } from "@/services/outfitEngine";
-import type { WeatherInfo } from "@/services/weather";
+import type { WeatherInfo } from "@/services/weatherService";
 
 function apiBaseUrl(): string {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;

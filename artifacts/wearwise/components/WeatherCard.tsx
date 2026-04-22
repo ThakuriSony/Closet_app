@@ -3,7 +3,7 @@ import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
-import type { WeatherInfo } from "@/services/weather";
+import type { WeatherInfo } from "@/services/weatherService";
 
 interface Props {
   weather: WeatherInfo | null;

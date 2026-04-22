@@ -1,38 +1,69 @@
+import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { buildGreeting } from "@/utils/greeting";
 
 interface Props {
-  name?: string;
-  location?: string;
+  name?: string | null;
+  location?: string | null;
+  locationLoading?: boolean;
   date?: Date;
-}
-
-function greetingFor(hour: number): string {
-  if (hour >= 5 && hour < 12) return "Good Morning";
-  if (hour >= 12 && hour < 18) return "Good Afternoon";
-  return "Good Evening";
+  onEditName?: () => void;
 }
 
 function formatDay(date: Date): string {
   return date.toLocaleDateString(undefined, { weekday: "long" });
 }
 
-export function GreetingHeader({ name, location, date = new Date() }: Props) {
+export function GreetingHeader({
+  name,
+  location,
+  locationLoading,
+  date = new Date(),
+  onEditName,
+}: Props) {
   const colors = useColors();
-  const greeting = greetingFor(date.getHours());
-  const who = name ? `${greeting}, ${name}` : greeting;
-  const subtitle = [formatDay(date), location].filter(Boolean).join(", ");
+  const greeting = buildGreeting(name ?? null, date);
+  const locationText = locationLoading
+    ? "Locating…"
+    : location ?? "Your location";
+  const subtitle = `${formatDay(date)}, ${locationText}`;
 
   return (
     <View>
       <Text style={[styles.kicker, { color: colors.mutedForeground }]}>
         Wearwise
       </Text>
-      <Text style={[styles.greeting, { color: colors.foreground }]}>
-        {who}
-      </Text>
+      <View style={styles.greetingRow}>
+        <Text
+          style={[styles.greeting, { color: colors.foreground }]}
+          numberOfLines={2}
+        >
+          {greeting}
+        </Text>
+        {onEditName ? (
+          <Pressable
+            onPress={onEditName}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.editBtn,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                opacity: pressed ? 0.6 : 1,
+              },
+            ]}
+          >
+            <Feather
+              name={name ? "edit-2" : "user-plus"}
+              size={14}
+              color={colors.mutedForeground}
+            />
+          </Pressable>
+        ) : null}
+      </View>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
         {subtitle}
       </Text>
@@ -48,10 +79,24 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 6,
   },
+  greetingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   greeting: {
+    flex: 1,
     fontSize: 28,
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.5,
+  },
+  editBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth,
   },
   subtitle: {
     marginTop: 4,

@@ -1,0 +1,185 @@
+You are a senior full-stack engineer.
+
+We are enhancing the Home screen of the Wearwise app.
+
+IMPORTANT:
+We already have a working Home UI. Do NOT redesign it. Only replace static data with real-time dynamic data.
+
+---
+
+GOAL:
+
+Make the Home screen dynamic by adding:
+
+1. Real-time user location
+2. Real-time weather based on location
+3. Smart greeting based on time of day
+4. Personalized greeting with user's name (fallback if unavailable)
+
+---
+
+FEATURES TO IMPLEMENT:
+
+---
+
+1. GET USER LOCATION (REAL-TIME)
+
+Use device location (Expo Location API).
+
+Steps:
+- Ask for permission
+- Get current latitude & longitude
+- Reverse geocode to get:
+  - City (e.g., Wichita)
+
+Display:
+“Wednesday, Wichita”
+
+Fallback:
+- If permission denied:
+  → Show “Your location”
+
+---
+
+2. FETCH REAL-TIME WEATHER
+
+Use a weather API (OpenWeather recommended)
+
+API should use:
+- latitude
+- longitude
+
+Fetch:
+- temperature
+- weather condition (e.g., Cloudy, Sunny)
+
+Display format:
+“18°C · Partly Cloudy”
+
+---
+
+3. WEATHER-BASED SUGGESTION TEXT
+
+Create simple logic:
+
+If temp < 10:
+→ “Layer up”
+
+If temp between 10–20:
+→ “Light jacket recommended”
+
+If temp > 20:
+→ “Keep it light”
+
+Final UI:
+“18°C · Partly Cloudy · Light jacket recommended”
+
+---
+
+4. SMART GREETING (TIME-BASED)
+
+Use device time:
+
+- 5:00–11:59 → “Good Morning”
+- 12:00–17:59 → “Good Afternoon”
+- 18:00–4:59 → “Good Evening”
+
+---
+
+5. USER NAME HANDLING (IMPORTANT DETAIL)
+
+Greeting format:
+
+If user name exists:
+→ “Good Afternoon, Sony”
+
+If NO name:
+→ “Good Afternoon”
+
+DO NOT hardcode name.
+
+Fetch from:
+- Firebase user profile (if available)
+
+---
+
+6. STATE MANAGEMENT
+
+Store:
+- location (city)
+- weather data
+- temperature
+- greeting
+
+Fetch data on:
+- Home screen load
+
+---
+
+7. LOADING STATES
+
+While loading:
+- Show skeleton or placeholder text:
+  “Loading weather...”
+
+Do NOT leave blank UI
+
+---
+
+8. ERROR HANDLING
+
+If weather API fails:
+→ Show:
+“Weather unavailable”
+
+If location fails:
+→ Use default weather (Mild logic)
+
+---
+
+9. CODE STRUCTURE
+
+Create:
+
+/services/locationService.ts
+- getUserLocation()
+- reverseGeocode()
+
+/services/weatherService.ts
+- fetchWeather(lat, lon)
+
+/utils/greeting.ts
+- getGreetingByTime()
+
+Keep logic separate from UI.
+
+---
+
+10. PERFORMANCE
+
+- Fetch location + weather once on load
+- Avoid repeated API calls
+- Cache result for session
+
+---
+
+OUTPUT FORMAT:
+
+1. New files (services + utils)
+2. Updated HomeScreen.tsx
+3. API setup instructions
+4. Permissions setup (Expo)
+5. Testing steps
+
+---
+
+CONSTRAINTS:
+
+- DO NOT redesign UI
+- DO NOT hardcode values
+- DO NOT block UI while loading
+- Keep everything clean and modular
+
+---
+
+Start implementing now.

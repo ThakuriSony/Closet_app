@@ -1,5 +1,5 @@
 import type { Category, ClothingItem } from "@/types";
-import type { WeatherBucket } from "@/services/weather";
+import type { WeatherBucket } from "@/services/weatherService";
 
 export type Occasion = "Work" | "Casual" | "Gym" | "Event";
 export const OCCASIONS: Occasion[] = ["Work", "Casual", "Gym", "Event"];

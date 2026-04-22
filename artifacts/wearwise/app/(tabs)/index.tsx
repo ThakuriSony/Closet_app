@@ -14,11 +14,17 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GreetingHeader } from "@/components/GreetingHeader";
+import { NameModal } from "@/components/NameModal";
 import { OccasionTabs } from "@/components/OccasionTabs";
 import { OutfitPreview } from "@/components/OutfitPreview";
 import { WeatherCard } from "@/components/WeatherCard";
+import { useProfile } from "@/contexts/ProfileContext";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  getUserLocation,
+  type UserLocation,
+} from "@/services/locationService";
 import {
   generateOutfit,
   type GeneratedOutfit,
@@ -30,7 +36,7 @@ import {
   FALLBACK_WEATHER,
   fetchWeather,
   type WeatherInfo,
-} from "@/services/weather";
+} from "@/services/weatherService";
 
 const H_PADDING = 20;
 
@@ -38,15 +44,19 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { items, addOutfit } = useWardrobe();
+  const { name, setName } = useProfile();
 
   const [occasion, setOccasion] = useState<Occasion>("Casual");
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [weatherLoading, setWeatherLoading] = useState<boolean>(true);
   const [weatherFailed, setWeatherFailed] = useState<boolean>(false);
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const [locationLoading, setLocationLoading] = useState<boolean>(true);
   const [outfit, setOutfit] = useState<GeneratedOutfit | null>(null);
   const [explanation, setExplanation] = useState<string>("");
   const [explaining, setExplaining] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
+  const [nameModalOpen, setNameModalOpen] = useState<boolean>(false);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const tabBarOffset = Platform.OS === "web" ? 100 : 110;
@@ -54,8 +64,16 @@ export default function HomeScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const result = await getUserLocation();
+      if (cancelled) return;
+
+      const loc = result.location;
+      setLocationLabel(loc?.city ?? "Your location");
+      setLocationLoading(false);
+
+      const target = loc ?? DEFAULT_LOCATION;
       try {
-        const w = await fetchWeather(DEFAULT_LOCATION);
+        const w = await fetchWeather(target);
         if (!cancelled) {
           setWeather(w);
           setWeatherFailed(false);
@@ -145,7 +163,12 @@ export default function HomeScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        <GreetingHeader location={DEFAULT_LOCATION.name} />
+        <GreetingHeader
+          name={name}
+          location={locationLabel}
+          locationLoading={locationLoading}
+          onEditName={() => setNameModalOpen(true)}
+        />
 
         <View style={{ height: 18 }} />
         <WeatherCard
@@ -296,6 +319,15 @@ export default function HomeScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
+
+      <NameModal
+        visible={nameModalOpen}
+        initialName={name}
+        onClose={() => setNameModalOpen(false)}
+        onSave={(next) => {
+          void setName(next);
+        }}
+      />
     </View>
   );
 }
