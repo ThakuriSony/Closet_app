@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "5BhDxXNUDG70pwtQsgwXa"
+uri = "file://artifacts/wearwise/assets/images/icon.png"
+type = "image"
+title = "wearwise app icon"

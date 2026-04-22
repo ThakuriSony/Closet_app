@@ -1,0 +1,146 @@
+You are a senior full-stack engineer.
+
+We are building Phase 1 of an AI wardrobe app called “Wearwise”.
+
+IMPORTANT:
+Only build the features defined in this phase. Do NOT add AI features, recommendations, or anything beyond scope.
+
+---
+
+GOAL OF PHASE 1:
+Build a working MVP where users can:
+1. Upload clothing items (image + manual details)
+2. View their closet in a grid
+3. Create outfits manually
+4. Save outfits
+
+---
+
+TECH STACK:
+Frontend: React Native (Expo)
+Backend: Firebase (Auth, Firestore, Storage)
+State: Zustand (or Context API if simpler)
+
+---
+
+FEATURES TO BUILD:
+
+1. AUTHENTICATION
+- Email + password login/signup using Firebase Auth
+- Simple login screen (no overdesign)
+
+---
+
+2. ADD CLOTHING ITEM
+Screen: “Add Item”
+
+Fields:
+- Upload image (from gallery or camera)
+- Category (dropdown: Top, Bottom, Shoes, Outerwear, Accessories)
+- Color (text or simple picker)
+- Optional tags (text input)
+
+Behavior:
+- Upload image to Firebase Storage
+- Save item in Firestore
+
+---
+
+3. CLOSET SCREEN
+Screen: “My Closet”
+
+- Display all clothing items in a grid
+- Show image + basic info
+- Tap item → open detail view
+
+---
+
+4. ITEM DETAIL SCREEN
+- Show full image
+- Show category, color, tags
+- Basic layout only (no editing required yet)
+
+---
+
+5. CREATE OUTFIT
+Screen: “Create Outfit”
+
+- User selects:
+  - 1 Top
+  - 1 Bottom
+  - 1 Shoes
+- Simple selection UI (grid or list)
+
+- Button: “Save Outfit”
+
+---
+
+6. OUTFIT STORAGE
+- Save selected items as an Outfit in Firestore
+
+Outfit model:
+- id
+- userId
+- items (array of clothing item IDs)
+- createdAt
+
+---
+
+7. OUTFITS SCREEN
+- List saved outfits
+- Show small previews (images of items)
+
+---
+
+DATA MODELS:
+
+User:
+- id
+- email
+
+ClothingItem:
+- id
+- userId
+- imageUrl
+- category
+- color
+- tags[]
+- createdAt
+
+Outfit:
+- id
+- userId
+- items[]
+- createdAt
+
+---
+
+UI REQUIREMENTS:
+- Keep UI minimal and clean
+- Use simple components (no heavy styling)
+- Focus on usability, not aesthetics
+
+---
+
+OUTPUT FORMAT:
+
+1. Folder structure
+2. All necessary code files
+3. Firebase setup instructions
+4. How to run the app
+5. What to test after implementation
+
+---
+
+CONSTRAINTS:
+
+- Do NOT implement AI features
+- Do NOT add recommendations
+- Do NOT overengineer
+- Keep components modular and readable
+
+---
+
+If anything is unclear, ask before implementing.
+
+Start building Phase 1 now.
