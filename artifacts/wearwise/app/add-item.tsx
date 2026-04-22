@@ -20,7 +20,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
+import { analyzeClothingImage } from "@/services/aiTagging";
 import type { Category } from "@/types";
+
+type AiState =
+  | { status: "idle" }
+  | { status: "analyzing" }
+  | { status: "suggested" }
+  | { status: "failed"; message: string };
 
 export default function AddItemScreen() {
   const colors = useColors();
@@ -32,16 +39,55 @@ export default function AddItemScreen() {
   const [color, setColor] = useState<string>("");
   const [tagsText, setTagsText] = useState<string>("");
   const [saving, setSaving] = useState<boolean>(false);
+  const [ai, setAi] = useState<AiState>({ status: "idle" });
+
+  const [lastAsset, setLastAsset] = useState<{
+    base64: string;
+    mimeType: string;
+  } | null>(null);
+
+  const runAnalysis = async (base64: string, mimeType: string) => {
+    setAi({ status: "analyzing" });
+    try {
+      const result = await analyzeClothingImage(base64, mimeType);
+      setCategory(result.category);
+      setColor(result.color);
+      setTagsText(result.tags.join(", "));
+      setAi({ status: "suggested" });
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Could not analyze the image.";
+      setAi({ status: "failed", message });
+    }
+  };
+
+  const handlePickedAsset = async (
+    asset: ImagePicker.ImagePickerAsset,
+  ) => {
+    setImageUri(asset.uri);
+    const base64 = asset.base64 ?? "";
+    const mimeType = asset.mimeType ?? "image/jpeg";
+    if (!base64) {
+      setAi({ status: "failed", message: "No image data available." });
+      return;
+    }
+    setLastAsset({ base64, mimeType });
+    await runAnalysis(base64, mimeType);
+  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      quality: 0.8,
+      quality: 0.7,
       aspect: [1, 1],
+      base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      await handlePickedAsset(result.assets[0]);
     }
   };
 
@@ -60,11 +106,12 @@ export default function AddItemScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      quality: 0.8,
+      quality: 0.7,
       aspect: [1, 1],
+      base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      await handlePickedAsset(result.assets[0]);
     }
   };
 
@@ -112,6 +159,7 @@ export default function AddItemScreen() {
       >
         <Pressable
           onPress={pickImage}
+          disabled={ai.status === "analyzing"}
           style={({ pressed }) => [
             styles.imageBox,
             {
@@ -122,11 +170,19 @@ export default function AddItemScreen() {
           ]}
         >
           {imageUri ? (
-            <Image
-              source={{ uri: imageUri }}
-              style={styles.image}
-              contentFit="cover"
-            />
+            <>
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.image}
+                contentFit="cover"
+              />
+              {ai.status === "analyzing" ? (
+                <View style={styles.imageOverlay}>
+                  <ActivityIndicator color="#ffffff" />
+                  <Text style={styles.overlayText}>Analyzing image…</Text>
+                </View>
+              ) : null}
+            </>
           ) : (
             <View style={styles.imagePlaceholder}>
               <Feather name="image" size={32} color={colors.mutedForeground} />
@@ -142,12 +198,13 @@ export default function AddItemScreen() {
         <View style={styles.actionsRow}>
           <Pressable
             onPress={pickImage}
+            disabled={ai.status === "analyzing"}
             style={({ pressed }) => [
               styles.actionBtn,
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                opacity: pressed ? 0.85 : 1,
+                opacity: pressed || ai.status === "analyzing" ? 0.7 : 1,
               },
             ]}
           >
@@ -158,12 +215,13 @@ export default function AddItemScreen() {
           </Pressable>
           <Pressable
             onPress={takePhoto}
+            disabled={ai.status === "analyzing"}
             style={({ pressed }) => [
               styles.actionBtn,
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                opacity: pressed ? 0.85 : 1,
+                opacity: pressed || ai.status === "analyzing" ? 0.7 : 1,
               },
             ]}
           >
@@ -173,6 +231,13 @@ export default function AddItemScreen() {
             </Text>
           </Pressable>
         </View>
+
+        <AiBanner
+          state={ai}
+          onRetry={() =>
+            lastAsset && runAnalysis(lastAsset.base64, lastAsset.mimeType)
+          }
+        />
 
         <Section label="Category">
           <CategoryPicker value={category} onChange={setCategory} />
@@ -228,12 +293,17 @@ export default function AddItemScreen() {
       >
         <Pressable
           onPress={onSave}
-          disabled={saving}
+          disabled={saving || ai.status === "analyzing"}
           style={({ pressed }) => [
             styles.saveBtn,
             {
               backgroundColor: colors.primary,
-              opacity: saving ? 0.6 : pressed ? 0.85 : 1,
+              opacity:
+                saving || ai.status === "analyzing"
+                  ? 0.6
+                  : pressed
+                    ? 0.85
+                    : 1,
             },
           ]}
         >
@@ -251,6 +321,79 @@ export default function AddItemScreen() {
           )}
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+function AiBanner({
+  state,
+  onRetry,
+}: {
+  state: AiState;
+  onRetry: () => void;
+}) {
+  const colors = useColors();
+  if (state.status === "idle") return null;
+
+  if (state.status === "analyzing") {
+    return (
+      <View
+        style={[
+          styles.banner,
+          { backgroundColor: colors.accent, borderColor: colors.border },
+        ]}
+      >
+        <ActivityIndicator size="small" color={colors.accentForeground} />
+        <Text
+          style={[styles.bannerText, { color: colors.accentForeground }]}
+        >
+          Analyzing image…
+        </Text>
+      </View>
+    );
+  }
+
+  if (state.status === "suggested") {
+    return (
+      <View
+        style={[
+          styles.banner,
+          { backgroundColor: colors.accent, borderColor: colors.border },
+        ]}
+      >
+        <Feather name="zap" size={14} color={colors.accentForeground} />
+        <Text
+          style={[styles.bannerText, { color: colors.accentForeground }]}
+        >
+          AI suggested these details. Edit any field before saving.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.banner,
+        {
+          backgroundColor: colors.secondary,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      <Feather name="alert-circle" size={14} color={colors.mutedForeground} />
+      <Text style={[styles.bannerText, { color: colors.mutedForeground }]}>
+        Couldn’t analyze automatically. Fill the fields below.
+      </Text>
+      <Pressable
+        onPress={onRetry}
+        hitSlop={8}
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+      >
+        <Text style={[styles.bannerLink, { color: colors.primary }]}>
+          Retry
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -283,6 +426,18 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   image: { width: "100%", height: "100%" },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  overlayText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
   imagePlaceholder: {
     flex: 1,
     alignItems: "center",
@@ -310,6 +465,25 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  banner: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  bannerLink: {
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
   sectionLabel: {

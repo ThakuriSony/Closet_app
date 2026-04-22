@@ -1,0 +1,139 @@
+You are a senior full-stack engineer.
+
+We are building Phase 2 of an AI wardrobe app called “Wearwise”.
+
+IMPORTANT:
+We are extending an existing Phase 1 app. DO NOT rebuild anything from Phase 1. Only add AI auto-tagging functionality.
+
+---
+
+GOAL OF PHASE 2:
+When a user uploads a clothing item image, the app should:
+1. Automatically detect attributes (category, color, tags)
+2. Show them to the user for confirmation/editing
+3. Save the final confirmed data
+
+---
+
+TECH STACK:
+Frontend: React Native (Expo)
+Backend: Firebase (Firestore + Storage)
+AI: OpenAI Vision API (or equivalent)
+
+---
+
+FEATURES TO BUILD:
+
+1. AI IMAGE ANALYSIS FUNCTION
+
+- When user selects an image, send it to AI API
+- The AI MUST return structured JSON (no text)
+
+Expected JSON format:
+{
+  "category": "Top | Bottom | Shoes | Outerwear | Accessories",
+  "color": "string",
+  "tags": ["string", "string"]
+}
+
+---
+
+2. PROMPT FOR AI (VERY IMPORTANT)
+
+Use a strict prompt like:
+
+"Analyze this clothing item image and return ONLY valid JSON in this format:
+{
+  category: one of [Top, Bottom, Shoes, Outerwear, Accessories],
+  color: main color,
+  tags: array of descriptive tags (e.g. casual, formal, sporty, denim, cotton)
+}
+Do not include any explanation or extra text."
+
+---
+
+3. ADD ITEM FLOW UPDATE
+
+Update “Add Item” screen:
+
+Step 1:
+- User uploads image
+
+Step 2:
+- Show loading state: “Analyzing image…”
+
+Step 3:
+- Autofill fields:
+  - category
+  - color
+  - tags
+
+Step 4:
+- User can edit all fields before saving
+
+---
+
+4. ERROR HANDLING
+
+- If AI fails:
+  - fallback to manual input
+- If JSON is invalid:
+  - retry once
+  - otherwise fallback
+
+---
+
+5. CONFIDENCE HANDLING (SIMPLE)
+
+- No need for real confidence scores
+- Just show:
+  “AI suggested these details”
+
+---
+
+6. BACKEND
+
+- No change to schema
+- Save final confirmed data only (not raw AI output)
+
+---
+
+CODE REQUIREMENTS:
+
+- Create a separate AI service module (e.g. /services/aiTagging.ts)
+- Keep API key secure (env variables)
+- Parse and validate JSON before using it
+- Handle edge cases cleanly
+
+---
+
+UI REQUIREMENTS:
+
+- Show loader during AI processing
+- Pre-fill form fields after AI response
+- Keep UX smooth and fast
+
+---
+
+OUTPUT FORMAT:
+
+1. Files to modify
+2. New files to create
+3. Code snippets (clean and minimal)
+4. Setup instructions for AI API
+5. How to test (include failure scenarios)
+
+---
+
+CONSTRAINTS:
+
+- DO NOT implement outfit recommendations yet
+- DO NOT overcomplicate AI logic
+- DO NOT store raw AI responses
+- Keep everything simple and reliable
+
+---
+
+If the AI response format is unclear or inconsistent, FIX it in code using validation.
+
+Start implementing Phase 2 now.
