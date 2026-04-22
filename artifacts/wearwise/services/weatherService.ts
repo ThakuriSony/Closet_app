@@ -1,5 +1,6 @@
 export interface WeatherInfo {
   tempC: number;
+  feelsLikeC: number;
   condition: string;
   bucket: WeatherBucket;
   recommendation: string;
@@ -61,18 +62,65 @@ function recommendationFor(bucket: WeatherBucket): string {
 export async function fetchWeather(
   loc: LocationInfo = DEFAULT_LOCATION,
 ): Promise<WeatherInfo> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weather_code&temperature_unit=celsius`;
-  const res = await fetch(url);
+  const params = new URLSearchParams({
+    latitude: String(loc.lat),
+    longitude: String(loc.lon),
+    current:
+      "temperature_2m,apparent_temperature,weather_code,is_day,relative_humidity_2m",
+    minutely_15: "temperature_2m,apparent_temperature",
+    timezone: "auto",
+    forecast_days: "1",
+    past_minutely_15: "1",
+    temperature_unit: "celsius",
+    models: "best_match",
+  });
+  const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+  const res = await fetch(url, { cache: "no-store" } as RequestInit);
   if (!res.ok) throw new Error(`Weather request failed (${res.status})`);
   const data = (await res.json()) as {
-    current?: { temperature_2m?: number; weather_code?: number };
+    current?: {
+      temperature_2m?: number;
+      apparent_temperature?: number;
+      weather_code?: number;
+    };
+    minutely_15?: {
+      time?: string[];
+      temperature_2m?: number[];
+      apparent_temperature?: number[];
+    };
   };
-  const tempC = Math.round(data.current?.temperature_2m ?? 18);
+
+  // Prefer the most recent 15-minute observation closest to "now" for better
+  // alignment with consumer weather apps; fall back to current if missing.
+  let rawTemp = data.current?.temperature_2m;
+  let rawFeels = data.current?.apparent_temperature;
+  const times = data.minutely_15?.time;
+  const temps = data.minutely_15?.temperature_2m;
+  const feels = data.minutely_15?.apparent_temperature;
+  if (times && temps && times.length === temps.length && times.length > 0) {
+    const now = Date.now();
+    let bestIdx = 0;
+    let bestDiff = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < times.length; i++) {
+      const t = new Date(times[i]).getTime();
+      const diff = Math.abs(now - t);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestIdx = i;
+      }
+    }
+    rawTemp = temps[bestIdx] ?? rawTemp;
+    if (feels && feels[bestIdx] != null) rawFeels = feels[bestIdx];
+  }
+
+  const tempC = Math.round(rawTemp ?? 18);
+  const feelsLikeC = Math.round(rawFeels ?? tempC);
   const code = data.current?.weather_code ?? 2;
   const condition = WEATHER_CODE_MAP[code] ?? "Cloudy";
   const bucket = bucketForTemp(tempC);
   return {
     tempC,
+    feelsLikeC,
     condition,
     bucket,
     recommendation: recommendationFor(bucket),
@@ -81,6 +129,7 @@ export async function fetchWeather(
 
 export const FALLBACK_WEATHER: WeatherInfo = {
   tempC: 18,
+  feelsLikeC: 18,
   condition: "Partly Cloudy",
   bucket: "Mild",
   recommendation: recommendationFor("Mild"),

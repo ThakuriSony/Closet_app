@@ -62,7 +62,9 @@ export function WeatherCard({ weather, loading, failed }: Props) {
           {weather.tempC}°C · {weather.condition}
         </Text>
         <Text style={[styles.recommendation, { color: colors.mutedForeground }]}>
-          {weather.recommendation}
+          {weather.feelsLikeC !== weather.tempC
+            ? `Feels like ${weather.feelsLikeC}°C · ${weather.recommendation}`
+            : weather.recommendation}
           {failed ? " · estimate" : ""}
         </Text>
       </View>
