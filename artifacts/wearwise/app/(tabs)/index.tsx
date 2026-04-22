@@ -1,237 +1,395 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  FlatList,
+  ActivityIndicator,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { CategoryPicker } from "@/components/CategoryPicker";
-import { EmptyState } from "@/components/EmptyState";
-import { ItemTile } from "@/components/ItemTile";
+import { GreetingHeader } from "@/components/GreetingHeader";
+import { OccasionTabs } from "@/components/OccasionTabs";
+import { OutfitPreview } from "@/components/OutfitPreview";
+import { WeatherCard } from "@/components/WeatherCard";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
-import { CATEGORIES, type Category } from "@/types";
+import {
+  generateOutfit,
+  type GeneratedOutfit,
+  type Occasion,
+} from "@/services/outfitEngine";
+import { explainOutfit } from "@/services/outfitExplain";
+import {
+  DEFAULT_LOCATION,
+  FALLBACK_WEATHER,
+  fetchWeather,
+  type WeatherInfo,
+} from "@/services/weather";
 
-const COLUMN_COUNT = 2;
-const GAP = 14;
 const H_PADDING = 20;
 
-type Filter = "All" | Category;
-
-export default function ClosetScreen() {
+export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { items } = useWardrobe();
-  const [filter, setFilter] = useState<Filter>("All");
+  const { items, addOutfit } = useWardrobe();
 
-  const filtered = useMemo(() => {
-    if (filter === "All") return items;
-    return items.filter((i) => i.category === filter);
-  }, [items, filter]);
-
-  const [containerWidth, setContainerWidth] = useState<number>(0);
-  const tileWidth =
-    containerWidth > 0
-      ? (containerWidth - H_PADDING * 2 - GAP * (COLUMN_COUNT - 1)) /
-        COLUMN_COUNT
-      : 0;
+  const [occasion, setOccasion] = useState<Occasion>("Casual");
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState<boolean>(true);
+  const [weatherFailed, setWeatherFailed] = useState<boolean>(false);
+  const [outfit, setOutfit] = useState<GeneratedOutfit | null>(null);
+  const [explanation, setExplanation] = useState<string>("");
+  const [explaining, setExplaining] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const tabBarOffset = Platform.OS === "web" ? 100 : 110;
 
-  const onAdd = () => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const w = await fetchWeather(DEFAULT_LOCATION);
+        if (!cancelled) {
+          setWeather(w);
+          setWeatherFailed(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setWeather(FALLBACK_WEATHER);
+          setWeatherFailed(true);
+        }
+      } finally {
+        if (!cancelled) setWeatherLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const canGenerate = useMemo(() => {
+    const cats = new Set(items.map((i) => i.category));
+    return cats.has("Top") && cats.has("Bottom") && cats.has("Shoes");
+  }, [items]);
+
+  const generate = useCallback(async () => {
+    if (!weather) return;
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    router.push("/add-item");
+    const result = generateOutfit(items, occasion, weather.bucket);
+    setOutfit(result);
+    setExplanation("");
+    if (
+      result.top &&
+      result.bottom &&
+      result.shoes &&
+      result.missing.length === 0
+    ) {
+      setExplaining(true);
+      try {
+        const text = await explainOutfit(result, occasion, weather);
+        setExplanation(text);
+      } catch {
+        setExplanation("");
+      } finally {
+        setExplaining(false);
+      }
+    }
+  }, [items, occasion, weather]);
+
+  // When the user changes occasion after generating, refresh
+  useEffect(() => {
+    if (outfit && weather) {
+      const result = generateOutfit(items, occasion, weather.bucket);
+      setOutfit(result);
+      setExplanation("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [occasion]);
+
+  const onSaveOutfit = async () => {
+    if (!outfit) return;
+    const ids = [outfit.top, outfit.bottom, outfit.shoes, outfit.outerwear]
+      .filter((i): i is NonNullable<typeof i> => Boolean(i))
+      .map((i) => i.id);
+    if (ids.length < 3) return;
+    setSaving(true);
+    try {
+      await addOutfit(ids);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
+  const isOutfitComplete =
+    outfit && outfit.top && outfit.bottom && outfit.shoes;
+
   return (
-    <View
-      style={[styles.container, { backgroundColor: colors.background }]}
-      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
-    >
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top + webTopInset + 12 },
-        ]}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: H_PADDING,
+          paddingTop: insets.top + webTopInset + 12,
+          paddingBottom: insets.bottom + tabBarOffset + 24,
+        }}
+        showsVerticalScrollIndicator={false}
       >
-        <View>
-          <Text style={[styles.kicker, { color: colors.mutedForeground }]}>
-            Wearwise
+        <GreetingHeader location={DEFAULT_LOCATION.name} />
+
+        <View style={{ height: 18 }} />
+        <WeatherCard
+          weather={weather}
+          loading={weatherLoading}
+          failed={weatherFailed}
+        />
+
+        <SectionLabel>Occasion</SectionLabel>
+        <OccasionTabs value={occasion} onChange={setOccasion} />
+
+        <SectionLabel>Today’s Outfit</SectionLabel>
+
+        {items.length < 3 ? (
+          <View
+            style={[
+              styles.notice,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <Feather name="info" size={16} color={colors.mutedForeground} />
+            <Text
+              style={[styles.noticeText, { color: colors.mutedForeground }]}
+            >
+              Add more items to get better outfit suggestions.
+            </Text>
+          </View>
+        ) : null}
+
+        <OutfitPreview outfit={outfit} />
+
+        {outfit && outfit.missing.length > 0 ? (
+          <Text style={[styles.missingText, { color: colors.mutedForeground }]}>
+            Missing: {outfit.missing.join(", ")}. Add more items to your closet
+            for a complete look.
           </Text>
-          <Text style={[styles.title, { color: colors.foreground }]}>
-            My Closet
-          </Text>
-        </View>
+        ) : null}
+
+        {(explaining || explanation) && isOutfitComplete ? (
+          <View
+            style={[
+              styles.whyCard,
+              { backgroundColor: colors.accent, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.whyHeader}>
+              <Feather
+                name="zap"
+                size={14}
+                color={colors.accentForeground}
+              />
+              <Text
+                style={[styles.whyTitle, { color: colors.accentForeground }]}
+              >
+                Why this works
+              </Text>
+            </View>
+            {explaining ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.accentForeground}
+                style={{ marginTop: 8, alignSelf: "flex-start" }}
+              />
+            ) : (
+              <Text
+                style={[styles.whyBody, { color: colors.accentForeground }]}
+              >
+                {explanation}
+              </Text>
+            )}
+          </View>
+        ) : null}
+
         <Pressable
-          onPress={onAdd}
+          onPress={generate}
+          disabled={!canGenerate || weatherLoading}
           style={({ pressed }) => [
-            styles.addBtn,
+            styles.generateBtn,
             {
               backgroundColor: colors.primary,
-              opacity: pressed ? 0.85 : 1,
+              opacity:
+                !canGenerate || weatherLoading
+                  ? 0.5
+                  : pressed
+                    ? 0.85
+                    : 1,
             },
           ]}
         >
-          <Feather name="plus" size={22} color={colors.primaryForeground} />
-        </Pressable>
-      </View>
-
-      <View style={styles.filterRow}>
-        <FilterChips value={filter} onChange={setFilter} />
-      </View>
-
-      {items.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <EmptyState
-            icon="package"
-            title="Your closet is empty"
-            description="Tap the + button to add your first clothing item."
+          <Feather
+            name="refresh-cw"
+            size={16}
+            color={colors.primaryForeground}
           />
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(i) => i.id}
-          numColumns={COLUMN_COUNT}
-          columnWrapperStyle={{ gap: GAP }}
-          contentContainerStyle={{
-            paddingHorizontal: H_PADDING,
-            paddingTop: 4,
-            paddingBottom: insets.bottom + tabBarOffset,
-            gap: GAP,
-          }}
-          renderItem={({ item }) => (
-            <ItemTile
-              item={item}
-              width={tileWidth}
-              onPress={() => router.push(`/item/${item.id}`)}
-            />
-          )}
-          ListEmptyComponent={
-            <View style={{ paddingTop: 60 }}>
-              <EmptyState
-                icon="filter"
-                title={`No ${filter.toLowerCase()} items`}
-                description="Try a different filter or add a new item."
-              />
-            </View>
-          }
-        />
-      )}
+          <Text
+            style={[
+              styles.generateLabel,
+              { color: colors.primaryForeground },
+            ]}
+          >
+            {outfit ? "Regenerate Outfit" : "Generate Outfit"}
+          </Text>
+        </Pressable>
+
+        {isOutfitComplete ? (
+          <Pressable
+            onPress={onSaveOutfit}
+            disabled={saving}
+            style={({ pressed }) => [
+              styles.saveBtn,
+              {
+                borderColor: colors.border,
+                opacity: saving ? 0.6 : pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={colors.foreground} />
+            ) : (
+              <>
+                <Feather
+                  name="bookmark"
+                  size={16}
+                  color={colors.foreground}
+                />
+                <Text
+                  style={[styles.saveLabel, { color: colors.foreground }]}
+                >
+                  Save to Outfits
+                </Text>
+              </>
+            )}
+          </Pressable>
+        ) : null}
+
+        {!canGenerate && items.length > 0 ? (
+          <Pressable
+            onPress={() => router.push("/add-item")}
+            style={({ pressed }) => ({
+              alignSelf: "center",
+              marginTop: 16,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Text style={[styles.linkText, { color: colors.primary }]}>
+              Add a Top, Bottom, and Shoes to get started
+            </Text>
+          </Pressable>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
 
-function FilterChips({
-  value,
-  onChange,
-}: {
-  value: Filter;
-  onChange: (f: Filter) => void;
-}) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
   const colors = useColors();
-  const all: Filter[] = ["All", ...CATEGORIES];
   return (
-    <View style={{ paddingHorizontal: H_PADDING }}>
-      <CategoryChipsRow>
-        {all.map((c) => {
-          const active = value === c;
-          return (
-            <Pressable
-              key={c}
-              onPress={() => onChange(c)}
-              style={({ pressed }) => [
-                styles.chip,
-                {
-                  backgroundColor: active ? colors.foreground : colors.card,
-                  borderColor: active ? colors.foreground : colors.border,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chipLabel,
-                  {
-                    color: active ? colors.background : colors.mutedForeground,
-                  },
-                ]}
-              >
-                {c}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </CategoryChipsRow>
-    </View>
-  );
-}
-
-function CategoryChipsRow({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={styles.chipRow}>
+    <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
       {children}
-    </View>
+    </Text>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: H_PADDING,
-    paddingBottom: 16,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-  },
-  kicker: {
+  sectionLabel: {
+    marginTop: 26,
+    marginBottom: 12,
     fontSize: 12,
-    fontFamily: "Inter_500Medium",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 1.5,
     textTransform: "uppercase",
-    marginBottom: 4,
   },
-  title: {
-    fontSize: 32,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.5,
-  },
-  addBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  filterRow: {
-    paddingBottom: 14,
-  },
-  chipRow: {
+  notice: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
     gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 14,
   },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
+  noticeText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  missingText: {
+    marginTop: 12,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  whyCard: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  chipLabel: {
-    fontSize: 13,
+  whyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  whyTitle: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  whyBody: {
+    marginTop: 8,
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    lineHeight: 20,
+  },
+  generateBtn: {
+    marginTop: 24,
+    paddingVertical: 16,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  generateLabel: {
+    fontSize: 16,
     fontFamily: "Inter_600SemiBold",
   },
-  emptyWrap: {
-    flex: 1,
+  saveBtn: {
+    marginTop: 10,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  saveLabel: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+  },
+  linkText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
   },
 });

@@ -1,0 +1,268 @@
+You are a senior full-stack engineer.
+
+We are enhancing Phase 3 of an AI wardrobe app called “Wearwise”.
+
+IMPORTANT:
+We are NOT rebuilding the app. We are:
+1. Adding a Home screen
+2. Making outfit generation context-aware (time, weather, occasion)
+
+Do NOT overbuild. Keep logic simple, clean, and extensible.
+
+---
+
+GOAL:
+
+Create a Home screen that:
+
+1. Greets user based on time of day
+2. Shows current date and location
+3. Displays current weather
+4. Lets user select an occasion (work, casual, gym, event)
+5. Suggests an outfit based on:
+   - user’s closet
+   - selected occasion
+   - current weather
+
+---
+
+HOME SCREEN UI:
+
+Layout (top to bottom):
+
+1. GREETING
+- “Good Morning / Afternoon / Evening, [User Name]”
+- Time-based:
+  - Morning: 5am–12pm
+  - Afternoon: 12pm–6pm
+  - Evening: 6pm–5am
+
+---
+
+2. DATE + LOCATION
+Example:
+“Wednesday, Wichita”
+
+- Format current date
+- Location can be static for now (no need for GPS yet)
+
+---
+
+3. WEATHER SECTION
+
+Example:
+“18°C · Partly Cloudy · Light jacket recommended”
+
+Use a weather API (e.g., OpenWeather)
+
+Display:
+- Temperature (Celsius)
+- Condition (e.g., cloudy, sunny)
+- Derived suggestion:
+  - Cold → “Layer up”
+  - Mild → “Light jacket recommended”
+  - Hot → “Keep it light”
+
+---
+
+4. OCCASION SELECTOR
+
+Horizontal selectable tabs:
+
+- Work
+- Casual
+- Gym
+- Event
+
+- Highlight selected option
+- Default = Casual
+
+---
+
+5. OUTFIT PREVIEW SECTION
+
+- Display suggested outfit (Top, Bottom, Shoes, optional Outerwear)
+- Use clothing images from user closet
+
+If no outfit yet:
+→ Show placeholder + “Generate Outfit”
+
+---
+
+6. GENERATE BUTTON
+
+Button:
+“Generate Outfit”
+
+- Triggers outfit generation using:
+  - selected occasion
+  - current weather
+
+---
+
+OUTFIT GENERATION LOGIC (VERY IMPORTANT):
+
+We are EXTENDING the existing outfit engine.
+
+Update function:
+generateOutfit(clothingItems, occasion, weather)
+
+---
+
+STEP 1 — WEATHER INTERPRETATION
+
+Convert temperature into category:
+
+- <10°C → Cold
+- 10–20°C → Mild
+- >20°C → Hot
+
+---
+
+STEP 2 — BASE REQUIREMENTS
+
+Always try to include:
+- 1 Top
+- 1 Bottom
+- 1 Shoes
+
+---
+
+STEP 3 — WEATHER RULES
+
+Cold:
+- MUST include Outerwear (if available)
+- Prefer thicker fabrics (tags: jacket, hoodie, wool)
+
+Mild:
+- Outerwear optional
+
+Hot:
+- Avoid outerwear
+- Prefer light tags (cotton, breathable, shorts)
+
+---
+
+STEP 4 — OCCASION RULES
+
+Work:
+- Prefer clean/simple tags (formal, neutral)
+- Avoid gym/sporty items
+
+Casual:
+- Flexible, allow most items
+
+Gym:
+- MUST include sporty/active tags
+
+Event:
+- Prefer stylish/dark/bold tags
+
+---
+
+STEP 5 — FILTER + SCORE SYSTEM (IMPORTANT)
+
+Instead of random selection:
+
+- Score each clothing item:
+  +1 if matches occasion
+  +1 if matches weather
+  +1 if frequently used tag match
+
+- Pick highest scoring items per category
+
+---
+
+STEP 6 — FALLBACK
+
+If no perfect match:
+- Relax filters gradually
+- Always return a usable outfit
+
+---
+
+STEP 7 — OUTPUT
+
+Return:
+- Top
+- Bottom
+- Shoes
+- Optional Outerwear
+
+---
+
+OPTIONAL AI ENHANCEMENT:
+
+After generating outfit:
+
+Send metadata to AI:
+
+Prompt:
+“Explain why this outfit works for [occasion] in [weather condition] in under 2 sentences.”
+
+Display under outfit:
+“Why this works”
+
+---
+
+CODE STRUCTURE:
+
+- Update /services/outfitEngine.ts
+- Create /screens/HomeScreen.tsx
+- Create reusable components:
+  - GreetingHeader
+  - WeatherCard
+  - OccasionTabs
+  - OutfitPreview
+
+---
+
+STATE MANAGEMENT:
+
+- Store selected occasion in state
+- Fetch weather on screen load
+- Recompute outfit when:
+  - user taps “Generate”
+  - occasion changes
+
+---
+
+UI REQUIREMENTS:
+
+- Clean, minimal
+- Card-based layout
+- Smooth loading states (especially weather + outfit)
+
+---
+
+ERROR HANDLING:
+
+- If weather API fails:
+  → fallback to “Mild”
+
+- If closet insufficient:
+  → show message:
+  “Add more items to get better outfit suggestions”
+
+---
+
+CONSTRAINTS:
+
+- DO NOT overuse AI
+- DO NOT generate outfits purely via AI
+- DO NOT hardcode outfits
+- Keep logic deterministic and explainable
+
+---
+
+OUTPUT FORMAT:
+
+1. New/updated files
+2. Core logic (scoring system)
+3. Weather integration
+4. UI components
+5. Testing instructions
+
+---
+
+Start implementing now.

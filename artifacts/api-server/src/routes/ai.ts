@@ -102,6 +102,64 @@ async function callModel(imageDataUrl: string): Promise<string> {
   return response.choices[0]?.message?.content ?? "";
 }
 
+interface ExplainItem {
+  slot: string;
+  category: string;
+  color: string;
+  tags: string[];
+}
+
+router.post("/ai/explain-outfit", async (req, res) => {
+  const body = req.body as {
+    occasion?: unknown;
+    weather?: { tempC?: unknown; condition?: unknown; bucket?: unknown };
+    items?: unknown;
+  };
+
+  const occasion = typeof body.occasion === "string" ? body.occasion : "";
+  const tempC =
+    typeof body.weather?.tempC === "number" ? body.weather.tempC : null;
+  const condition =
+    typeof body.weather?.condition === "string" ? body.weather.condition : "";
+  const items = Array.isArray(body.items) ? (body.items as ExplainItem[]) : [];
+
+  if (!occasion || tempC === null || items.length === 0) {
+    res.status(400).json({ error: "occasion, weather and items required" });
+    return;
+  }
+
+  const itemSummary = items
+    .map(
+      (i) =>
+        `${i.slot}: ${i.color} ${i.category}${
+          i.tags?.length ? ` (${i.tags.join(", ")})` : ""
+        }`,
+    )
+    .join("\n");
+
+  const prompt = `Outfit:
+${itemSummary}
+
+Occasion: ${occasion}
+Weather: ${tempC}°C, ${condition}
+
+Explain in 1-2 short sentences why this outfit works for the occasion and weather. Be friendly and concrete. No greetings, no labels, just the explanation.`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.4",
+      max_completion_tokens: 8192,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const explanation =
+      completion.choices[0]?.message?.content?.trim() ?? "";
+    res.json({ explanation });
+  } catch (err) {
+    req.log.error({ err }, "Outfit explanation failed");
+    res.status(502).json({ error: "AI service unavailable" });
+  }
+});
+
 router.post("/ai/tag-clothing", async (req, res) => {
   const body = req.body as { imageBase64?: unknown; mimeType?: unknown };
   const imageBase64 =
