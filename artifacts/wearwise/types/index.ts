@@ -22,3 +22,27 @@ export interface Outfit {
   itemIds: string[];
   createdAt: number;
 }
+
+export type EventCategory =
+  | "Work"
+  | "Casual"
+  | "Party"
+  | "Formal"
+  | "Sporty";
+
+export const EVENT_CATEGORIES: EventCategory[] = [
+  "Work",
+  "Casual",
+  "Party",
+  "Formal",
+  "Sporty",
+];
+
+export interface WearEvent {
+  id: string;
+  title: string;
+  category: EventCategory;
+  dateTime: number;
+  reminderEnabled: boolean;
+  createdAt: number;
+}

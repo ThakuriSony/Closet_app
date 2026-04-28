@@ -1,8 +1,14 @@
-import type { Category, ClothingItem } from "@/types";
+import type { Category, ClothingItem, EventCategory } from "@/types";
 import type { WeatherBucket } from "@/services/weatherService";
 
-export type Occasion = "Work" | "Casual" | "Gym" | "Event";
-export const OCCASIONS: Occasion[] = ["Work", "Casual", "Gym", "Event"];
+export type Occasion = "Work" | "Casual" | "Gym" | "Party" | "Formal";
+export const OCCASIONS: Occasion[] = [
+  "Work",
+  "Casual",
+  "Gym",
+  "Party",
+  "Formal",
+];
 
 export interface GeneratedOutfit {
   top?: ClothingItem;
@@ -16,14 +22,16 @@ const OCCASION_PREFER: Record<Occasion, string[]> = {
   Work: ["formal", "neutral", "business", "smart", "office", "clean"],
   Casual: ["casual", "everyday", "denim", "cotton", "relaxed"],
   Gym: ["sporty", "active", "athletic", "gym", "running", "workout"],
-  Event: ["stylish", "dark", "bold", "elegant", "party", "evening"],
+  Party: ["stylish", "dark", "bold", "party", "evening", "trendy"],
+  Formal: ["formal", "elegant", "tailored", "suit", "dress", "smart"],
 };
 
 const OCCASION_AVOID: Record<Occasion, string[]> = {
   Work: ["sporty", "gym", "athletic", "workout"],
   Casual: [],
   Gym: ["formal", "business"],
-  Event: ["sporty", "gym", "athletic"],
+  Party: ["sporty", "gym", "athletic"],
+  Formal: ["sporty", "gym", "athletic", "casual"],
 };
 
 const WEATHER_PREFER: Record<WeatherBucket, string[]> = {
@@ -31,6 +39,19 @@ const WEATHER_PREFER: Record<WeatherBucket, string[]> = {
   Mild: ["cotton", "denim", "long-sleeve"],
   Hot: ["cotton", "linen", "breathable", "shorts", "light", "tank"],
 };
+
+// Map event categories onto occasion buckets used by the engine.
+const EVENT_TO_OCCASION: Record<EventCategory, Occasion> = {
+  Work: "Work",
+  Casual: "Casual",
+  Party: "Party",
+  Formal: "Formal",
+  Sporty: "Gym",
+};
+
+export function occasionForEvent(category: EventCategory): Occasion {
+  return EVENT_TO_OCCASION[category];
+}
 
 function normalize(s: string): string {
   return s.trim().toLowerCase();
@@ -75,7 +96,6 @@ function scoreItem(
   const weatherMatches = matchCount(item, WEATHER_PREFER[weather]);
   score += weatherMatches;
 
-  // Frequently used tag bonus (cap so it doesn't dominate)
   const popularBonus = item.tags.reduce((n, tag) => {
     const f = freq.get(normalize(tag)) ?? 0;
     return n + (f >= 2 ? 1 : 0);
@@ -86,7 +106,6 @@ function scoreItem(
     score -= 5;
   }
 
-  // Tiny tie-breaker so newer items win when tied
   score += Math.min(item.createdAt / 1e15, 0.001);
 
   return score;
@@ -102,7 +121,6 @@ function pickBest(
   const pool = items.filter((i) => i.category === category);
   if (pool.length === 0) return undefined;
 
-  // First pass: strict (penalize avoid tags)
   const strictRanked = [...pool].sort(
     (a, b) =>
       scoreItem(b, occasion, weather, freq, true) -
@@ -114,7 +132,6 @@ function pickBest(
     ? scoreItem(top, occasion, weather, freq, true)
     : -Infinity;
 
-  // Fallback: if best strict score is negative (only avoid-tagged items), relax
   if (topScore < 0) {
     const relaxed = [...pool].sort(
       (a, b) =>
@@ -130,16 +147,22 @@ export function generateOutfit(
   items: ClothingItem[],
   occasion: Occasion,
   weather: WeatherBucket,
+  eventCategory?: EventCategory,
 ): GeneratedOutfit {
+  // If an event category is provided, it overrides the selected occasion.
+  const effectiveOccasion: Occasion = eventCategory
+    ? occasionForEvent(eventCategory)
+    : occasion;
+
   const freq = buildTagFrequency(items);
 
-  const top = pickBest(items, "Top", occasion, weather, freq);
-  const bottom = pickBest(items, "Bottom", occasion, weather, freq);
-  const shoes = pickBest(items, "Shoes", occasion, weather, freq);
+  const top = pickBest(items, "Top", effectiveOccasion, weather, freq);
+  const bottom = pickBest(items, "Bottom", effectiveOccasion, weather, freq);
+  const shoes = pickBest(items, "Shoes", effectiveOccasion, weather, freq);
 
   let outerwear: ClothingItem | undefined;
   if (weather !== "Hot") {
-    outerwear = pickBest(items, "Outerwear", occasion, weather, freq);
+    outerwear = pickBest(items, "Outerwear", effectiveOccasion, weather, freq);
   }
 
   const missing: Category[] = [];

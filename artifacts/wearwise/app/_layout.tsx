@@ -14,6 +14,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { EventsProvider } from "@/contexts/EventsContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { WardrobeProvider } from "@/contexts/WardrobeContext";
 
@@ -37,6 +38,13 @@ function RootLayoutNav() {
         options={{
           presentation: "modal",
           title: "Create Outfit",
+        }}
+      />
+      <Stack.Screen
+        name="add-event"
+        options={{
+          presentation: "modal",
+          title: "Add Event",
         }}
       />
       <Stack.Screen
@@ -73,7 +81,9 @@ export default function RootLayout() {
             <KeyboardProvider>
               <ProfileProvider>
                 <WardrobeProvider>
-                  <RootLayoutNav />
+                  <EventsProvider>
+                    <RootLayoutNav />
+                  </EventsProvider>
                 </WardrobeProvider>
               </ProfileProvider>
             </KeyboardProvider>

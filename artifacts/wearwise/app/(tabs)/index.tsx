@@ -17,16 +17,20 @@ import { GreetingHeader } from "@/components/GreetingHeader";
 import { NameModal } from "@/components/NameModal";
 import { OccasionTabs } from "@/components/OccasionTabs";
 import { OutfitPreview } from "@/components/OutfitPreview";
+import { UpcomingEventCard } from "@/components/UpcomingEventCard";
 import { WeatherCard } from "@/components/WeatherCard";
+import { useEvents } from "@/contexts/EventsContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
+import { getEventsWithinHours } from "@/services/eventService";
 import {
   getUserLocation,
   type UserLocation,
 } from "@/services/locationService";
 import {
   generateOutfit,
+  occasionForEvent,
   type GeneratedOutfit,
   type Occasion,
 } from "@/services/outfitEngine";
@@ -37,6 +41,7 @@ import {
   fetchWeather,
   type WeatherInfo,
 } from "@/services/weatherService";
+import type { EventCategory, WearEvent } from "@/types";
 
 const H_PADDING = 20;
 
@@ -45,8 +50,13 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { items, addOutfit } = useWardrobe();
   const { name, setName } = useProfile();
+  const { events } = useEvents();
 
   const [occasion, setOccasion] = useState<Occasion>("Casual");
+  const [eventOverride, setEventOverride] = useState<{
+    category: EventCategory;
+    event: WearEvent;
+  } | null>(null);
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [weatherLoading, setWeatherLoading] = useState<boolean>(true);
   const [weatherFailed, setWeatherFailed] = useState<boolean>(false);
@@ -97,34 +107,71 @@ export default function HomeScreen() {
     return cats.has("Top") && cats.has("Bottom") && cats.has("Shoes");
   }, [items]);
 
-  const generate = useCallback(async () => {
-    if (!weather) return;
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    const result = generateOutfit(items, occasion, weather.bucket);
-    setOutfit(result);
-    setExplanation("");
-    if (
-      result.top &&
-      result.bottom &&
-      result.shoes &&
-      result.missing.length === 0
-    ) {
-      setExplaining(true);
-      try {
-        const text = await explainOutfit(result, occasion, weather);
-        setExplanation(text);
-      } catch {
-        setExplanation("");
-      } finally {
-        setExplaining(false);
-      }
-    }
-  }, [items, occasion, weather]);
+  // Show the next event happening within 48 hours (with reminder enabled).
+  const upcomingEvent = useMemo<WearEvent | null>(() => {
+    const list = getEventsWithinHours(events, 48).filter(
+      (e) => e.reminderEnabled,
+    );
+    return list[0] ?? null;
+  }, [events]);
 
-  // When the user changes occasion after generating, refresh
+  const effectiveOccasion: Occasion = eventOverride
+    ? occasionForEvent(eventOverride.category)
+    : occasion;
+
+  const generate = useCallback(
+    async (overrideCategory?: EventCategory) => {
+      if (!weather) return;
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      const result = generateOutfit(
+        items,
+        occasion,
+        weather.bucket,
+        overrideCategory ?? eventOverride?.category,
+      );
+      setOutfit(result);
+      setExplanation("");
+      if (
+        result.top &&
+        result.bottom &&
+        result.shoes &&
+        result.missing.length === 0
+      ) {
+        const occForExplain: Occasion = overrideCategory
+          ? occasionForEvent(overrideCategory)
+          : effectiveOccasion;
+        setExplaining(true);
+        try {
+          const text = await explainOutfit(result, occForExplain, weather);
+          setExplanation(text);
+        } catch {
+          setExplanation("");
+        } finally {
+          setExplaining(false);
+        }
+      }
+    },
+    [items, occasion, weather, eventOverride, effectiveOccasion],
+  );
+
+  const onGenerateForEvent = useCallback(() => {
+    if (!upcomingEvent) return;
+    setEventOverride({
+      category: upcomingEvent.category,
+      event: upcomingEvent,
+    });
+    void generate(upcomingEvent.category);
+  }, [upcomingEvent, generate]);
+
+  const clearEventOverride = useCallback(() => {
+    setEventOverride(null);
+  }, []);
+
+  // When the user changes occasion (and is not in event-override mode), refresh
   useEffect(() => {
+    if (eventOverride) return;
     if (outfit && weather) {
       const result = generateOutfit(items, occasion, weather.bucket);
       setOutfit(result);
@@ -177,8 +224,40 @@ export default function HomeScreen() {
           failed={weatherFailed}
         />
 
-        <SectionLabel>Occasion</SectionLabel>
-        <OccasionTabs value={occasion} onChange={setOccasion} />
+        {upcomingEvent ? (
+          <UpcomingEventCard
+            event={upcomingEvent}
+            onGenerate={onGenerateForEvent}
+          />
+        ) : null}
+
+        <SectionLabel>
+          {eventOverride
+            ? `Dressing for: ${eventOverride.event.title}`
+            : "Occasion"}
+        </SectionLabel>
+        {eventOverride ? (
+          <Pressable
+            onPress={clearEventOverride}
+            style={({ pressed }) => [
+              styles.clearOverride,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Feather name="x" size={14} color={colors.mutedForeground} />
+            <Text
+              style={[styles.clearOverrideText, { color: colors.foreground }]}
+            >
+              {eventOverride.category} · tap to clear
+            </Text>
+          </Pressable>
+        ) : (
+          <OccasionTabs value={occasion} onChange={setOccasion} />
+        )}
 
         <SectionLabel>Today’s Outfit</SectionLabel>
 
@@ -243,7 +322,7 @@ export default function HomeScreen() {
         ) : null}
 
         <Pressable
-          onPress={generate}
+          onPress={() => generate()}
           disabled={!canGenerate || weatherLoading}
           style={({ pressed }) => [
             styles.generateBtn,
@@ -422,6 +501,20 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  clearOverride: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  clearOverrideText: {
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
 });

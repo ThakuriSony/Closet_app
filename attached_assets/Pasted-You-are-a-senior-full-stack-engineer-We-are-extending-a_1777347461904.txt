@@ -1,0 +1,264 @@
+You are a senior full-stack engineer.
+
+We are extending an existing React Native (Expo) app called “Wearwise”.
+
+CURRENT STATE:
+The app already has:
+- Home screen (with greeting, weather, outfit generator)
+- Closet screen
+- Outfits screen
+- Working outfitEngine (occasion + weather based)
+
+---
+
+GOAL OF THIS PHASE:
+
+1. Add a new “Events” tab (4-tab navigation total)
+2. Allow users to create and store events
+3. Show upcoming events
+4. Use event category to influence outfit generation
+5. Integrate event selection into Home outfit generator
+
+---
+
+IMPORTANT:
+DO NOT rebuild existing screens.
+DO NOT redesign UI.
+ONLY extend functionality cleanly.
+
+---
+
+NAVIGATION UPDATE:
+
+Update bottom tabs to:
+
+- Home
+- Closet
+- Outfits
+- Events
+
+---
+
+1. EVENTS TAB — MAIN SCREEN
+
+Create: EventsScreen.tsx
+
+Features:
+
+- Header: “Your Events”
+- List of events sorted by date (ascending)
+
+Each event item shows:
+- Title (e.g. “John’s Wedding”)
+- Category (e.g. Formal)
+- Date + time
+
+Add floating button:
+→ “+ Add Event”
+
+---
+
+2. ADD EVENT SCREEN
+
+Create: AddEventScreen.tsx
+
+Form fields:
+
+1. Title (text input)
+   Placeholder: “e.g. John’s Wedding”
+
+2. Event Type (SELECTABLE CHIPS, NOT dropdown)
+
+Options:
+- Work
+- Casual
+- Party
+- Formal
+- Sporty
+
+Store selected value as:
+event.category
+
+---
+
+3. Date Picker
+- Use native date picker
+
+4. Time Picker
+- Use native time picker
+
+5. Reminder Toggle (boolean)
+- “Remind me”
+
+(Default ON)
+
+6. Save Button
+
+---
+
+3. DATABASE (Firestore)
+
+Create new collection:
+
+events:
+
+Event model:
+- id
+- userId
+- title
+- category (Work | Casual | Party | Formal | Sporty)
+- dateTime (timestamp)
+- reminderEnabled (boolean)
+- createdAt
+
+---
+
+4. UPCOMING EVENT LOGIC
+
+In Events screen:
+- Sort by date
+- Highlight next upcoming event
+
+---
+
+5. HOME SCREEN INTEGRATION
+
+Update Home screen:
+
+If there is an upcoming event within next 48 hours:
+
+Show card:
+
+“Upcoming: [Event Title]”
+“Tomorrow · 6:00 PM”
+
+Button:
+→ “Generate Outfit”
+
+---
+
+6. OUTFIT GENERATION UPDATE (IMPORTANT)
+
+Modify existing generateOutfit() function:
+
+Add optional param:
+generateOutfit(clothingItems, occasion, weather, eventCategory)
+
+---
+
+PRIORITY LOGIC:
+
+If eventCategory exists:
+→ override occasion
+
+Else:
+→ use selected occasion from Home
+
+---
+
+Example:
+Event = Formal → treat as Formal outfit
+
+---
+
+7. HOME SCREEN — EVENT TYPE IN GENERATOR
+
+You already have:
+work / casual / gym / event tabs
+
+UPDATE THIS:
+
+Replace “event” tab with:
+
+- Work
+- Casual
+- Gym
+- Party
+- Formal
+
+(align with event categories)
+
+---
+
+8. CONNECTION BETWEEN EVENTS + GENERATOR
+
+When user taps:
+“Generate Outfit” from event card:
+
+→ pass event.category into outfit engine
+
+---
+
+9. REMINDER SYSTEM (SIMPLE VERSION)
+
+Do NOT integrate external calendar.
+
+Instead:
+
+On app load:
+- Check events within next 24 hours
+
+If found:
+→ show alert OR Home card
+
+(Optional):
+Use Expo Notifications if already set up
+
+---
+
+10. CODE STRUCTURE
+
+Create:
+
+/screens/EventsScreen.tsx
+/screens/AddEventScreen.tsx
+
+/services/eventService.ts
+- createEvent()
+- getUserEvents()
+
+Update:
+/services/outfitEngine.ts
+
+---
+
+11. UI REQUIREMENTS
+
+- Keep UI minimal
+- Use simple cards and chips
+- No heavy styling
+- Reuse components if possible
+
+---
+
+12. ERROR HANDLING
+
+- If no events:
+→ show “No events yet”
+
+- If form incomplete:
+→ disable Save button
+
+---
+
+OUTPUT FORMAT:
+
+1. Navigation updates
+2. New screens (Events + Add Event)
+3. Firestore integration
+4. Outfit engine update
+5. Home screen changes
+6. Testing steps
+
+---
+
+CONSTRAINTS:
+
+- DO NOT overcomplicate categories
+- DO NOT add calendar integrations
+- DO NOT use AI for event classification
+- Keep everything clean and modular
+
+---
+
+Start implementing Phase 4 now.
