@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   FlatList,
   Platform,
@@ -21,15 +21,23 @@ import type { Outfit } from "@/types";
 
 const H_PADDING = 20;
 
+type OutfitFilter = "All" | "Favorites";
+
 export default function OutfitsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { outfits, items, removeOutfit } = useWardrobe();
+  const { outfits, items, removeOutfit, toggleOutfitFavorite } = useWardrobe();
+  const [filter, setFilter] = useState<OutfitFilter>("All");
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const tabBarOffset = Platform.OS === "web" ? 100 : 110;
 
   const canCreate = items.length > 0;
+
+  const filteredOutfits = useMemo(() => {
+    if (filter === "All") return outfits;
+    return outfits.filter((o) => o.isFavorite);
+  }, [outfits, filter]);
 
   const onCreate = () => {
     if (!canCreate) {
@@ -54,6 +62,13 @@ export default function OutfitsScreen() {
         onPress: () => removeOutfit(outfit.id),
       },
     ]);
+  };
+
+  const onToggleFav = (outfit: Outfit) => {
+    if (Platform.OS !== "web") {
+      Haptics.selectionAsync();
+    }
+    void toggleOutfitFavorite(outfit.id);
   };
 
   return (
@@ -86,6 +101,12 @@ export default function OutfitsScreen() {
         </Pressable>
       </View>
 
+      {outfits.length > 0 ? (
+        <View style={styles.filterRow}>
+          <OutfitFilterChips value={filter} onChange={setFilter} />
+        </View>
+      ) : null}
+
       {outfits.length === 0 ? (
         <View style={styles.emptyWrap}>
           <EmptyState
@@ -94,13 +115,21 @@ export default function OutfitsScreen() {
             description="Combine a top, bottom, and shoes to save your first outfit."
           />
         </View>
+      ) : filteredOutfits.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <EmptyState
+            icon="heart"
+            title="No favorites yet"
+            description="Tap the heart on any outfit to save it here."
+          />
+        </View>
       ) : (
         <FlatList
-          data={outfits}
+          data={filteredOutfits}
           keyExtractor={(o) => o.id}
           contentContainerStyle={{
             paddingHorizontal: H_PADDING,
-            paddingTop: 8,
+            paddingTop: 4,
             paddingBottom: insets.bottom + tabBarOffset,
             gap: 14,
           }}
@@ -144,17 +173,43 @@ export default function OutfitsScreen() {
                   >
                     {outfitItems.map((i) => i.category).join(" · ")}
                   </Text>
-                  <Pressable
-                    onPress={() => onDelete(item)}
-                    hitSlop={10}
-                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-                  >
-                    <Feather
-                      name="trash-2"
-                      size={18}
-                      color={colors.mutedForeground}
-                    />
-                  </Pressable>
+                  <View style={styles.actions}>
+                    <Pressable
+                      onPress={() => onToggleFav(item)}
+                      hitSlop={10}
+                      accessibilityLabel={
+                        item.isFavorite
+                          ? "Remove from favorites"
+                          : "Add to favorites"
+                      }
+                      style={({ pressed }) => ({
+                        opacity: pressed ? 0.5 : 1,
+                      })}
+                    >
+                      <Feather
+                        name="heart"
+                        size={18}
+                        color={
+                          item.isFavorite
+                            ? colors.primary
+                            : colors.mutedForeground
+                        }
+                      />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => onDelete(item)}
+                      hitSlop={10}
+                      style={({ pressed }) => ({
+                        opacity: pressed ? 0.5 : 1,
+                      })}
+                    >
+                      <Feather
+                        name="trash-2"
+                        size={18}
+                        color={colors.mutedForeground}
+                      />
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             );
@@ -165,11 +220,62 @@ export default function OutfitsScreen() {
   );
 }
 
+function OutfitFilterChips({
+  value,
+  onChange,
+}: {
+  value: OutfitFilter;
+  onChange: (f: OutfitFilter) => void;
+}) {
+  const colors = useColors();
+  const all: OutfitFilter[] = ["All", "Favorites"];
+  return (
+    <View style={styles.chipRow}>
+      {all.map((c) => {
+        const active = value === c;
+        const isFav = c === "Favorites";
+        return (
+          <Pressable
+            key={c}
+            onPress={() => onChange(c)}
+            style={({ pressed }) => [
+              styles.chip,
+              {
+                backgroundColor: active ? colors.foreground : colors.card,
+                borderColor: active ? colors.foreground : colors.border,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            {isFav ? (
+              <Feather
+                name="heart"
+                size={12}
+                color={active ? colors.background : colors.mutedForeground}
+              />
+            ) : null}
+            <Text
+              style={[
+                styles.chipLabel,
+                {
+                  color: active ? colors.background : colors.mutedForeground,
+                },
+              ]}
+            >
+              {c}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingHorizontal: H_PADDING,
-    paddingBottom: 20,
+    paddingBottom: 14,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
@@ -192,6 +298,28 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+  },
+  filterRow: {
+    paddingHorizontal: H_PADDING,
+    paddingBottom: 14,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  chipLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
   },
   emptyWrap: { flex: 1 },
   card: {
@@ -222,5 +350,10 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
   },
 });

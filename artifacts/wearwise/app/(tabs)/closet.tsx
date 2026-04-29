@@ -23,13 +23,13 @@ const COLUMN_COUNT = 2;
 const GAP = 14;
 const H_PADDING = 20;
 
-type Filter = "All" | Category;
+type Filter = "All" | "Favorites" | Category;
 type ViewMode = "Closet" | "Laundry";
 
 export default function ClosetScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { items, markItemWashed } = useWardrobe();
+  const { items, markItemWashed, toggleItemFavorite } = useWardrobe();
   const [filter, setFilter] = useState<Filter>("All");
   const [mode, setMode] = useState<ViewMode>("Closet");
 
@@ -50,6 +50,7 @@ export default function ClosetScreen() {
 
   const filtered = useMemo(() => {
     if (filter === "All") return cleanItems;
+    if (filter === "Favorites") return cleanItems.filter((i) => i.isFavorite);
     return cleanItems.filter((i) => i.category === filter);
   }, [cleanItems, filter]);
 
@@ -154,14 +155,28 @@ export default function ClosetScreen() {
                   item={item}
                   width={tileWidth}
                   onPress={() => router.push(`/item/${item.id}`)}
+                  onToggleFavorite={() => {
+                    if (Platform.OS !== "web") {
+                      Haptics.selectionAsync();
+                    }
+                    void toggleItemFavorite(item.id);
+                  }}
                 />
               )}
               ListEmptyComponent={
                 <View style={{ paddingTop: 60 }}>
                   <EmptyState
-                    icon="filter"
-                    title={`No ${filter.toLowerCase()} items`}
-                    description="Try a different filter or add a new item."
+                    icon={filter === "Favorites" ? "heart" : "filter"}
+                    title={
+                      filter === "Favorites"
+                        ? "No favorites yet"
+                        : `No ${filter.toLowerCase()} items`
+                    }
+                    description={
+                      filter === "Favorites"
+                        ? "Tap the heart on any item to save it here."
+                        : "Try a different filter or add a new item."
+                    }
                   />
                 </View>
               }
@@ -320,12 +335,13 @@ function FilterChips({
   onChange: (f: Filter) => void;
 }) {
   const colors = useColors();
-  const all: Filter[] = ["All", ...CATEGORIES];
+  const all: Filter[] = ["All", "Favorites", ...CATEGORIES];
   return (
     <View style={{ paddingHorizontal: H_PADDING }}>
       <View style={styles.chipRow}>
         {all.map((c) => {
           const active = value === c;
+          const isFav = c === "Favorites";
           return (
             <Pressable
               key={c}
@@ -336,9 +352,19 @@ function FilterChips({
                   backgroundColor: active ? colors.foreground : colors.card,
                   borderColor: active ? colors.foreground : colors.border,
                   opacity: pressed ? 0.85 : 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
                 },
               ]}
             >
+              {isFav ? (
+                <Feather
+                  name="heart"
+                  size={12}
+                  color={active ? colors.background : colors.mutedForeground}
+                />
+              ) : null}
               <Text
                 style={[
                   styles.chipLabel,

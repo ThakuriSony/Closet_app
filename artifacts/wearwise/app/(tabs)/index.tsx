@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -49,6 +50,10 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { items, addOutfit, markItemsWorn } = useWardrobe();
+  const favoriteItems = useMemo(
+    () => items.filter((i) => i.isFavorite).slice(0, 3),
+    [items],
+  );
   const {
     name,
     dirtyThreshold,
@@ -253,6 +258,33 @@ export default function HomeScreen() {
           loading={weatherLoading}
           failed={weatherFailed}
         />
+
+        {favoriteItems.length > 0 ? (
+          <View style={styles.favSection}>
+            <SectionLabel>Your Favorites</SectionLabel>
+            <View style={styles.favRow}>
+              {favoriteItems.map((it) => (
+                <Pressable
+                  key={it.id}
+                  onPress={() => router.push(`/item/${it.id}`)}
+                  style={({ pressed }) => [
+                    styles.favTile,
+                    {
+                      backgroundColor: colors.secondary,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: it.imageUri }}
+                    style={styles.favImg}
+                    contentFit="cover"
+                  />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         {upcomingEvent ? (
           <UpcomingEventCard
@@ -612,5 +644,22 @@ const styles = StyleSheet.create({
   clearOverrideText: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
+  },
+  favSection: {
+    marginTop: 4,
+  },
+  favRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  favTile: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  favImg: {
+    width: "100%",
+    height: "100%",
   },
 });

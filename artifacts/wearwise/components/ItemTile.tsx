@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -8,11 +9,18 @@ import type { ClothingItem } from "@/types";
 interface ItemTileProps {
   item: ClothingItem;
   onPress?: () => void;
+  onToggleFavorite?: () => void;
   selected?: boolean;
   width: number;
 }
 
-export function ItemTile({ item, onPress, selected, width }: ItemTileProps) {
+export function ItemTile({
+  item,
+  onPress,
+  onToggleFavorite,
+  selected,
+  width,
+}: ItemTileProps) {
   const colors = useColors();
   const isDirty = item.status === "dirty";
   return (
@@ -42,6 +50,30 @@ export function ItemTile({ item, onPress, selected, width }: ItemTileProps) {
               Dirty
             </Text>
           </View>
+        ) : null}
+        {onToggleFavorite ? (
+          <Pressable
+            onPress={onToggleFavorite}
+            hitSlop={8}
+            accessibilityLabel={
+              item.isFavorite ? "Remove from favorites" : "Add to favorites"
+            }
+            style={({ pressed }) => [
+              styles.favBtn,
+              {
+                backgroundColor: item.isFavorite
+                  ? colors.primary
+                  : "rgba(0,0,0,0.45)",
+                opacity: pressed ? 0.75 : 1,
+              },
+            ]}
+          >
+            <Feather
+              name="heart"
+              size={14}
+              color={item.isFavorite ? colors.primaryForeground : "#fff"}
+            />
+          </Pressable>
         ) : null}
       </View>
       <View style={styles.meta}>
@@ -83,6 +115,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
+  },
+  favBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
   badgeText: {
     fontSize: 10,

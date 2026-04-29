@@ -17,7 +17,7 @@ function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
-// Backfill laundry fields on items saved before Phase 6.
+// Backfill new fields on records saved before later phases.
 function normalizeItem(raw: Partial<ClothingItem> & { id: string }): ClothingItem {
   return {
     id: raw.id,
@@ -29,6 +29,16 @@ function normalizeItem(raw: Partial<ClothingItem> & { id: string }): ClothingIte
     wearCount: typeof raw.wearCount === "number" ? raw.wearCount : 0,
     status: raw.status === "dirty" ? "dirty" : "clean",
     lastWorn: typeof raw.lastWorn === "number" ? raw.lastWorn : null,
+    isFavorite: raw.isFavorite === true,
+  };
+}
+
+function normalizeOutfit(raw: Partial<Outfit> & { id: string }): Outfit {
+  return {
+    id: raw.id,
+    itemIds: Array.isArray(raw.itemIds) ? raw.itemIds : [],
+    createdAt: raw.createdAt ?? Date.now(),
+    isFavorite: raw.isFavorite === true,
   };
 }
 
@@ -51,6 +61,8 @@ interface WardrobeContextValue {
     dirtyThreshold: number,
   ) => Promise<void>;
   markItemWashed: (id: string) => Promise<void>;
+  toggleItemFavorite: (id: string) => Promise<void>;
+  toggleOutfitFavorite: (id: string) => Promise<void>;
 }
 
 const WardrobeContext = createContext<WardrobeContextValue | null>(null);
@@ -73,7 +85,12 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
           >;
           setItems(parsed.map(normalizeItem));
         }
-        if (rawOutfits) setOutfits(JSON.parse(rawOutfits));
+        if (rawOutfits) {
+          const parsedOutfits = JSON.parse(rawOutfits) as Array<
+            Partial<Outfit> & { id: string }
+          >;
+          setOutfits(parsedOutfits.map(normalizeOutfit));
+        }
       } catch {
         // ignore
       } finally {
@@ -104,6 +121,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         wearCount: 0,
         status: "clean",
         lastWorn: null,
+        isFavorite: false,
       };
       const next = [item, ...items];
       await persistItems(next);
@@ -135,6 +153,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         id: genId(),
         itemIds,
         createdAt: Date.now(),
+        isFavorite: false,
       };
       const next = [outfit, ...outfits];
       await persistOutfits(next);
@@ -179,6 +198,30 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     [items, persistItems],
   );
 
+  const toggleItemFavorite = useCallback<
+    WardrobeContextValue["toggleItemFavorite"]
+  >(
+    async (id) => {
+      const next = items.map((it) =>
+        it.id === id ? { ...it, isFavorite: !it.isFavorite } : it,
+      );
+      await persistItems(next);
+    },
+    [items, persistItems],
+  );
+
+  const toggleOutfitFavorite = useCallback<
+    WardrobeContextValue["toggleOutfitFavorite"]
+  >(
+    async (id) => {
+      const next = outfits.map((o) =>
+        o.id === id ? { ...o, isFavorite: !o.isFavorite } : o,
+      );
+      await persistOutfits(next);
+    },
+    [outfits, persistOutfits],
+  );
+
   const value = useMemo<WardrobeContextValue>(
     () => ({
       items,
@@ -191,6 +234,8 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       removeOutfit,
       markItemsWorn,
       markItemWashed,
+      toggleItemFavorite,
+      toggleOutfitFavorite,
     }),
     [
       items,
@@ -203,6 +248,8 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       removeOutfit,
       markItemsWorn,
       markItemWashed,
+      toggleItemFavorite,
+      toggleOutfitFavorite,
     ],
   );
 

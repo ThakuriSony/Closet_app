@@ -20,6 +20,7 @@ export interface ClothingItem {
   wearCount: number;
   status: ItemStatus;
   lastWorn: number | null;
+  isFavorite: boolean;
 }
 
 export const DIRTY_THRESHOLD_MIN = 1;
@@ -30,6 +31,7 @@ export interface Outfit {
   id: string;
   itemIds: string[];
   createdAt: number;
+  isFavorite: boolean;
 }
 
 export type EventCategory =
