@@ -1,0 +1,123 @@
+You are a senior React Native (Expo) engineer.
+
+We are fixing an issue in the Wearwise app where camera captures are cropped into a square, causing incorrect AI clothing detection.
+
+---
+
+CURRENT PROBLEM:
+
+- Camera uses square frame
+- Clothing gets cropped
+- AI tagging becomes inaccurate (e.g., pants detected as top)
+
+---
+
+GOAL:
+
+Fix camera flow to:
+1. Capture full image (no forced cropping)
+2. Preserve aspect ratio
+3. Allow user to preview before upload
+4. Send full image to AI tagging
+
+---
+
+1. UPDATE CAMERA CONFIGURATION
+
+- Use full device aspect ratio (4:3 or default)
+- REMOVE square cropping
+
+Ensure:
+- Image is captured in full frame
+- No automatic cropping applied
+
+---
+
+2. ADD IMAGE PREVIEW SCREEN
+
+After capture:
+
+Show full image preview
+
+Options:
+- “Use Photo”
+- “Retake”
+
+(Do NOT immediately upload after capture)
+
+---
+
+3. REMOVE AUTO-CROP BEFORE AI
+
+Ensure:
+
+- Image sent to AI = original full image
+- No resizing/cropping that removes content
+
+---
+
+4. OPTIONAL IMAGE RESIZE (SAFE)
+
+If needed:
+- Resize for performance (max width/height)
+- BUT maintain full aspect ratio
+
+---
+
+5. UPDATE AI TAGGING PROMPT
+
+Modify prompt:
+
+“Analyze the full clothing item in this image. If part of the clothing is not fully visible, infer the most likely category carefully.”
+
+---
+
+6. TEST CASES
+
+Test:
+
+- Full outfit (top + bottom)
+- Pants only
+- Long dresses
+- Shoes
+
+Ensure:
+- No cropping
+- Correct classification
+
+---
+
+7. EDGE CASE
+
+If image is unclear:
+→ allow user to manually correct category
+
+---
+
+8. FILES TO UPDATE
+
+- Camera component
+- Image picker logic
+- AddItem screen
+- AI tagging service (prompt only)
+
+---
+
+OUTPUT:
+
+1. Updated camera config
+2. Preview screen implementation
+3. AI tagging improvement
+4. Testing steps
+
+---
+
+CONSTRAINTS:
+
+- DO NOT force square crop
+- DO NOT degrade image quality excessively
+- Keep UX simple and clean
+
+---
+
+Start fixing camera flow now.

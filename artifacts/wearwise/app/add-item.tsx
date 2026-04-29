@@ -29,12 +29,32 @@ type AiState =
   | { status: "suggested" }
   | { status: "failed"; message: string };
 
+type PickerSource = "camera" | "library";
+
+interface PendingAsset {
+  uri: string;
+  base64: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  source: PickerSource;
+}
+
+// Keep the on-screen preview box from getting absurdly tall for very portrait
+// shots while still showing the photo without forcing a square crop.
+function clampAspectRatio(width: number, height: number): number {
+  if (!width || !height) return 3 / 4;
+  const raw = width / height;
+  return Math.min(4 / 3, Math.max(0.6, raw));
+}
+
 export default function AddItemScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { addItem } = useWardrobe();
 
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageAspect, setImageAspect] = useState<number>(3 / 4);
   const [category, setCategory] = useState<Category>("Top");
   const [color, setColor] = useState<string>("");
   const [tagsText, setTagsText] = useState<string>("");
@@ -45,6 +65,10 @@ export default function AddItemScreen() {
     base64: string;
     mimeType: string;
   } | null>(null);
+
+  // The most recently captured/picked asset that the user hasn't confirmed yet.
+  // We hold off uploading to the AI until the user explicitly approves.
+  const [pendingAsset, setPendingAsset] = useState<PendingAsset | null>(null);
 
   const runAnalysis = async (base64: string, mimeType: string) => {
     setAi({ status: "analyzing" });
@@ -64,31 +88,44 @@ export default function AddItemScreen() {
     }
   };
 
-  const handlePickedAsset = async (
-    asset: ImagePicker.ImagePickerAsset,
-  ) => {
+  const acceptAsset = async (asset: PendingAsset) => {
     setImageUri(asset.uri);
-    const base64 = asset.base64 ?? "";
-    const mimeType = asset.mimeType ?? "image/jpeg";
-    if (!base64) {
+    setImageAspect(clampAspectRatio(asset.width, asset.height));
+    setPendingAsset(null);
+    if (!asset.base64) {
       setAi({ status: "failed", message: "No image data available." });
       return;
     }
-    setLastAsset({ base64, mimeType });
-    await runAnalysis(base64, mimeType);
+    setLastAsset({ base64: asset.base64, mimeType: asset.mimeType });
+    await runAnalysis(asset.base64, asset.mimeType);
+  };
+
+  const handlePickerResult = (
+    result: ImagePicker.ImagePickerResult,
+    source: PickerSource,
+  ) => {
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset) return;
+    setPendingAsset({
+      uri: asset.uri,
+      base64: asset.base64 ?? "",
+      mimeType: asset.mimeType ?? "image/jpeg",
+      width: asset.width ?? 0,
+      height: asset.height ?? 0,
+      source,
+    });
   };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      allowsEditing: true,
-      quality: 0.7,
-      aspect: [1, 1],
+      // No allowsEditing / aspect — capture the full original photo.
+      quality: 0.85,
       base64: true,
+      exif: false,
     });
-    if (!result.canceled && result.assets[0]) {
-      await handlePickedAsset(result.assets[0]);
-    }
+    handlePickerResult(result, "library");
   };
 
   const takePhoto = async () => {
@@ -105,13 +142,26 @@ export default function AddItemScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.7,
-      aspect: [1, 1],
+      // No allowsEditing / aspect — capture the device's full frame.
+      quality: 0.85,
       base64: true,
+      exif: false,
     });
-    if (!result.canceled && result.assets[0]) {
-      await handlePickedAsset(result.assets[0]);
+    handlePickerResult(result, "camera");
+  };
+
+  const onConfirmPending = () => {
+    if (!pendingAsset) return;
+    void acceptAsset(pendingAsset);
+  };
+
+  const onRetakePending = () => {
+    const source = pendingAsset?.source ?? "camera";
+    setPendingAsset(null);
+    if (source === "camera") {
+      void takePhoto();
+    } else {
+      void pickImage();
     }
   };
 
@@ -147,6 +197,10 @@ export default function AddItemScreen() {
     }
   };
 
+  const previewAspect = pendingAsset
+    ? clampAspectRatio(pendingAsset.width, pendingAsset.height)
+    : imageAspect;
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <KeyboardAwareScrollViewCompat
@@ -158,23 +212,29 @@ export default function AddItemScreen() {
         bottomOffset={20}
       >
         <Pressable
-          onPress={pickImage}
-          disabled={ai.status === "analyzing"}
+          onPress={pendingAsset ? undefined : pickImage}
+          disabled={ai.status === "analyzing" || !!pendingAsset}
           style={({ pressed }) => [
             styles.imageBox,
             {
               backgroundColor: colors.secondary,
-              borderColor: colors.border,
               opacity: pressed ? 0.9 : 1,
+              aspectRatio: imageUri || pendingAsset ? previewAspect : 1,
             },
           ]}
         >
-          {imageUri ? (
+          {pendingAsset ? (
+            <Image
+              source={{ uri: pendingAsset.uri }}
+              style={styles.image}
+              contentFit="contain"
+            />
+          ) : imageUri ? (
             <>
               <Image
                 source={{ uri: imageUri }}
                 style={styles.image}
-                contentFit="cover"
+                contentFit="contain"
               />
               {ai.status === "analyzing" ? (
                 <View style={styles.imageOverlay}>
@@ -195,42 +255,92 @@ export default function AddItemScreen() {
           )}
         </Pressable>
 
-        <View style={styles.actionsRow}>
-          <Pressable
-            onPress={pickImage}
-            disabled={ai.status === "analyzing"}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                opacity: pressed || ai.status === "analyzing" ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Feather name="image" size={16} color={colors.foreground} />
-            <Text style={[styles.actionLabel, { color: colors.foreground }]}>
-              Library
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={takePhoto}
-            disabled={ai.status === "analyzing"}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                opacity: pressed || ai.status === "analyzing" ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Feather name="camera" size={16} color={colors.foreground} />
-            <Text style={[styles.actionLabel, { color: colors.foreground }]}>
-              Camera
-            </Text>
-          </Pressable>
-        </View>
+        {pendingAsset ? (
+          <View style={styles.previewActions}>
+            <Pressable
+              onPress={onRetakePending}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name="refresh-cw"
+                size={16}
+                color={colors.foreground}
+              />
+              <Text style={[styles.actionLabel, { color: colors.foreground }]}>
+                Retake
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onConfirmPending}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                styles.actionBtnPrimary,
+                {
+                  backgroundColor: colors.primary,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name="check"
+                size={16}
+                color={colors.primaryForeground}
+              />
+              <Text
+                style={[
+                  styles.actionLabel,
+                  { color: colors.primaryForeground },
+                ]}
+              >
+                Use Photo
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.actionsRow}>
+            <Pressable
+              onPress={pickImage}
+              disabled={ai.status === "analyzing"}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed || ai.status === "analyzing" ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Feather name="image" size={16} color={colors.foreground} />
+              <Text style={[styles.actionLabel, { color: colors.foreground }]}>
+                Library
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={takePhoto}
+              disabled={ai.status === "analyzing"}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed || ai.status === "analyzing" ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Feather name="camera" size={16} color={colors.foreground} />
+              <Text style={[styles.actionLabel, { color: colors.foreground }]}>
+                Camera
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
         <AiBanner
           state={ai}
@@ -241,6 +351,9 @@ export default function AddItemScreen() {
 
         <Section label="Category">
           <CategoryPicker value={category} onChange={setCategory} />
+          <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+            Tap to change if the suggestion looks off.
+          </Text>
         </Section>
 
         <Section label="Color">
@@ -293,13 +406,13 @@ export default function AddItemScreen() {
       >
         <Pressable
           onPress={onSave}
-          disabled={saving || ai.status === "analyzing"}
+          disabled={saving || ai.status === "analyzing" || !!pendingAsset}
           style={({ pressed }) => [
             styles.saveBtn,
             {
               backgroundColor: colors.primary,
               opacity:
-                saving || ai.status === "analyzing"
+                saving || ai.status === "analyzing" || pendingAsset
                   ? 0.6
                   : pressed
                     ? 0.85
@@ -419,11 +532,9 @@ function Section({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   imageBox: {
-    aspectRatio: 1,
     width: "100%",
     borderRadius: 18,
     overflow: "hidden",
-    borderWidth: StyleSheet.hairlineWidth,
   },
   image: { width: "100%", height: "100%" },
   imageOverlay: {
@@ -453,6 +564,11 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 12,
   },
+  previewActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
   actionBtn: {
     flex: 1,
     flexDirection: "row",
@@ -460,8 +576,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 15,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  actionBtnPrimary: {
+    borderWidth: 0,
   },
   actionLabel: {
     fontSize: 14,
@@ -517,7 +636,7 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },

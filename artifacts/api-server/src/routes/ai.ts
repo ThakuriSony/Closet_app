@@ -19,12 +19,19 @@ interface TagResult {
 }
 
 const SYSTEM_PROMPT = `You are an expert fashion stylist that tags clothing items.
-Analyze the clothing item image and return ONLY valid JSON in this exact format:
+Analyze the full clothing item in this image. If part of the clothing is not fully visible, infer the most likely category carefully based on the visible portion (fabric, seams, silhouette, position in frame).
+Return ONLY valid JSON in this exact format:
 {
   "category": one of [Top, Bottom, Shoes, Outerwear, Accessories],
   "color": main color of the item as a short string (e.g. "Charcoal", "Cream", "Navy"),
   "tags": array of 2-5 short descriptive tags (e.g. casual, formal, sporty, denim, cotton, linen, summer)
 }
+Category guidance:
+- Top = shirts, t-shirts, blouses, sweaters, hoodies (worn on torso, not as a coat)
+- Bottom = pants, jeans, shorts, skirts, leggings (worn below the waist)
+- Shoes = any footwear
+- Outerwear = jackets, coats, blazers, parkas (worn over a top)
+- Accessories = bags, hats, belts, scarves, jewelry, glasses
 Do not include any explanation, markdown, or extra text. Output JSON only.`;
 
 function extractJson(text: string): unknown {
@@ -89,7 +96,7 @@ async function callModel(imageDataUrl: string): Promise<string> {
         content: [
           {
             type: "text",
-            text: "Analyze this clothing item and return only the JSON.",
+            text: "Analyze the full clothing item in this image. If part of it is not fully visible, infer the most likely category carefully. Return only the JSON.",
           },
           {
             type: "image_url",
