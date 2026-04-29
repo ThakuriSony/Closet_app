@@ -36,6 +36,7 @@ import {
   type Occasion,
 } from "@/services/outfitEngine";
 import { explainOutfit } from "@/services/outfitExplain";
+import { rescheduleNotifications } from "@/services/notificationService";
 import {
   DEFAULT_LOCATION,
   FALLBACK_WEATHER,
@@ -57,6 +58,7 @@ export default function HomeScreen() {
     hasDirtyThreshold,
     loading: profileLoading,
     setDirtyThreshold,
+    notificationsEnabled,
   } = useProfile();
   const { events } = useEvents();
 
@@ -117,6 +119,17 @@ export default function HomeScreen() {
       cancelled = true;
     };
   }, []);
+
+  // Schedule (or clear) local notifications whenever the inputs that affect
+  // them change. The service internally dedupes by signature so this is cheap.
+  useEffect(() => {
+    if (weatherLoading) return;
+    void rescheduleNotifications({
+      events,
+      weather,
+      enabled: notificationsEnabled,
+    });
+  }, [events, weather, weatherLoading, notificationsEnabled]);
 
   const canGenerate = useMemo(() => {
     const cats = new Set(items.map((i) => i.category));

@@ -1,0 +1,162 @@
+You are a senior full-stack engineer.
+
+We are adding a smart notification system to the Wearwise app.
+
+IMPORTANT:
+Notifications must feel helpful, human, and non-intrusive.
+
+Do NOT spam users.
+Do NOT use robotic language.
+
+---
+
+GOAL:
+
+Implement context-aware notifications based on:
+
+1. Weather changes
+2. Upcoming events
+3. Daily outfit suggestions
+
+---
+
+1. SETUP NOTIFICATIONS
+
+Use Expo Notifications.
+
+- Request permission on app start
+- Store permission state
+
+---
+
+2. WEATHER-BASED NOTIFICATIONS
+
+Trigger conditions:
+
+A. Rain expected (from forecast)
+→ Send:
+“Hey, it might rain later—don’t forget an umbrella ☔”
+
+B. Temperature drop in evening (compare afternoon vs evening)
+
+If eveningTemp < afternoonTemp by 6+ degrees:
+→ Send:
+“It’s getting chilly this evening, maybe grab a light jacket”
+
+C. Large temp range (day fluctuation)
+
+If (maxTemp - minTemp > 10):
+→ Send:
+“Warm afternoon, cool evening—layers might help today”
+
+---
+
+3. EVENT REMINDERS
+
+Use existing events data.
+
+Trigger:
+
+- 24 hours before event
+- 2 hours before event
+
+Notification messages:
+
+24h before:
+“You’ve got [Event Title] tomorrow—want to plan your outfit?”
+
+2h before:
+“Your event is coming up—your outfit’s ready”
+
+---
+
+4. DAILY OUTFIT NUDGE
+
+Trigger:
+- Once per day (morning, e.g. 8 AM)
+
+Message:
+“Not sure what to wear? I’ve got something ready for you 👀”
+
+---
+
+5. SMART SCHEDULING
+
+- Schedule notifications using local notifications
+- Recalculate daily (on app open or background task)
+
+---
+
+6. HUMAN-FRIENDLY LANGUAGE (IMPORTANT)
+
+All messages must:
+
+- Sound casual and helpful
+- Avoid robotic tone
+- Be short and clear
+
+Examples:
+- “Hey, it might rain later…”
+- “Looks like a cool evening ahead…”
+
+---
+
+7. USER CONTROL (IMPORTANT)
+
+Add toggle in Profile:
+
+“Notifications”
+
+- Enable / disable all notifications
+
+---
+
+8. EDGE CASES
+
+- If notifications disabled → do nothing
+- Avoid duplicate notifications in same day
+- Limit to max 2–3 notifications per day
+
+---
+
+9. CODE STRUCTURE
+
+Create:
+
+/services/notificationService.ts
+
+Functions:
+- scheduleWeatherNotifications()
+- scheduleEventReminders()
+- scheduleDailyOutfitNudge()
+
+---
+
+10. PERFORMANCE
+
+- Schedule notifications once per day
+- Avoid repeated scheduling
+- Cancel old notifications before scheduling new ones
+
+---
+
+OUTPUT:
+
+1. Notification service
+2. Scheduling logic
+3. Integration with weather + events
+4. Profile toggle
+5. Testing steps
+
+---
+
+CONSTRAINTS:
+
+- DO NOT over-notify
+- DO NOT use generic system messages
+- Keep tone human and friendly
+- Keep implementation simple
+
+---
+
+Start implementing notifications now.

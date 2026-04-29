@@ -230,7 +230,7 @@ export default function ProfileScreen() {
               Notifications
             </Text>
             <Text style={[styles.helper, { color: colors.mutedForeground }]}>
-              Get reminders for upcoming events. Coming soon.
+              Daily wardrobe nudges, weather heads-ups, and event reminders.
             </Text>
           </View>
           <Switch
