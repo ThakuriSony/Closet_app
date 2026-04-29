@@ -19,15 +19,18 @@ const PROFILE_KEY = "wearwise:profile:v1";
 interface Profile {
   name: string | null;
   dirtyThreshold: number | null;
+  notificationsEnabled: boolean;
 }
 
 interface ProfileContextValue {
   name: string | null;
   dirtyThreshold: number;
   hasDirtyThreshold: boolean;
+  notificationsEnabled: boolean;
   loading: boolean;
   setName: (next: string | null) => Promise<void>;
   setDirtyThreshold: (n: number) => Promise<void>;
+  setNotificationsEnabled: (enabled: boolean) => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -41,6 +44,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile>({
     name: null,
     dirtyThreshold: null,
+    notificationsEnabled: true,
   });
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -59,6 +63,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
               typeof parsed.dirtyThreshold === "number"
                 ? clampThreshold(parsed.dirtyThreshold)
                 : null,
+            notificationsEnabled:
+              typeof parsed.notificationsEnabled === "boolean"
+                ? parsed.notificationsEnabled
+                : true,
           });
         }
       } catch {
@@ -92,16 +100,27 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     [profile, persist],
   );
 
+  const setNotificationsEnabled = useCallback<
+    ProfileContextValue["setNotificationsEnabled"]
+  >(
+    async (enabled) => {
+      await persist({ ...profile, notificationsEnabled: enabled });
+    },
+    [profile, persist],
+  );
+
   const value = useMemo<ProfileContextValue>(
     () => ({
       name: profile.name,
       dirtyThreshold: profile.dirtyThreshold ?? DIRTY_THRESHOLD_DEFAULT,
       hasDirtyThreshold: profile.dirtyThreshold !== null,
+      notificationsEnabled: profile.notificationsEnabled,
       loading,
       setName,
       setDirtyThreshold,
+      setNotificationsEnabled,
     }),
-    [profile, loading, setName, setDirtyThreshold],
+    [profile, loading, setName, setDirtyThreshold, setNotificationsEnabled],
   );
 
   return (

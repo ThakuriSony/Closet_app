@@ -1,0 +1,136 @@
+You are a senior full-stack engineer.
+
+We are refining the Home screen and Profile system in the Wearwise app.
+
+IMPORTANT:
+This is a UI + structure cleanup. Do NOT rebuild screens. Modify existing layout and logic.
+
+---
+
+GOALS:
+
+1. Remove duplicate profile icons
+2. Keep only ONE profile icon (top-right)
+3. Make Profile screen the central place for user settings
+4. Add key settings inside Profile
+
+---
+
+1. REMOVE DUPLICATE PROFILE ICON
+
+On Home screen:
+
+- REMOVE the profile icon from the top-left
+- KEEP only one profile icon on the top-right
+
+Ensure:
+- Layout remains balanced after removal
+- No empty spacing or misalignment
+
+---
+
+2. SINGLE PROFILE ENTRY POINT
+
+Top-right icon should:
+
+- Navigate to ProfileScreen.tsx
+- Be the ONLY access point for user settings
+
+---
+
+3. UPDATE PROFILE SCREEN
+
+Ensure Profile screen includes:
+
+---
+
+SECTION: “Profile”
+
+- Name field:
+  Label: “What should we call you?”
+  Editable text input
+  Save to user profile
+
+---
+
+SECTION: “Laundry Settings”
+
+- Label:
+  “Laundry Sensitivity”
+
+- Show current value:
+  “After X wears”
+
+- Editable selector (1–5)
+
+- Save to Firestore
+
+---
+
+OPTIONAL (if easy to add):
+
+SECTION: “App Preferences”
+
+- Toggle (future-ready, simple placeholder):
+  - Notifications (on/off)
+
+---
+
+4. DATA HANDLING
+
+Ensure:
+
+- User name is stored in user profile
+- Used in greeting:
+  “Good Evening, [Name]”
+
+Fallback:
+- If no name → just “Good Evening”
+
+---
+
+5. HOME SCREEN UPDATE
+
+- Ensure greeting uses updated name
+- Ensure only ONE profile icon is visible
+
+---
+
+6. UI CLEANUP
+
+- Align header properly after removing left icon
+- Keep spacing consistent
+- Maintain clean, minimal look
+
+---
+
+7. CODE STRUCTURE
+
+Update:
+
+/screens/HomeScreen.tsx
+/screens/ProfileScreen.tsx
+/services/userService.ts
+
+---
+
+8. CONSTRAINTS
+
+- DO NOT add multiple profile entry points
+- DO NOT overdesign Profile screen
+- Keep layout simple and clean
+- Maintain existing functionality
+
+---
+
+OUTPUT:
+
+1. Updated Home screen layout
+2. Updated Profile screen
+3. User data updates (name + laundry threshold)
+4. Navigation fixes
+5. Testing steps
+
+---
+
+Start refining now.

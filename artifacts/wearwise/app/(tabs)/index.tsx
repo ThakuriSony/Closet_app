@@ -14,7 +14,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GreetingHeader } from "@/components/GreetingHeader";
-import { NameModal } from "@/components/NameModal";
 import { OccasionTabs } from "@/components/OccasionTabs";
 import { OutfitPreview } from "@/components/OutfitPreview";
 import { PreferencesModal } from "@/components/PreferencesModal";
@@ -52,7 +51,6 @@ export default function HomeScreen() {
   const { items, addOutfit, markItemsWorn } = useWardrobe();
   const {
     name,
-    setName,
     dirtyThreshold,
     hasDirtyThreshold,
     loading: profileLoading,
@@ -75,7 +73,6 @@ export default function HomeScreen() {
   const [explaining, setExplaining] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [worn, setWorn] = useState<boolean>(false);
-  const [nameModalOpen, setNameModalOpen] = useState<boolean>(false);
   const [prefsModalOpen, setPrefsModalOpen] = useState<boolean>(false);
 
   // Show preferences setup the first time the user opens Home.
@@ -243,27 +240,11 @@ export default function HomeScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.topBar}>
-          <Pressable
-            onPress={() => router.push("/profile")}
-            hitSlop={10}
-            style={({ pressed }) => [
-              styles.profileBtn,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                opacity: pressed ? 0.6 : 1,
-              },
-            ]}
-          >
-            <Feather name="user" size={16} color={colors.foreground} />
-          </Pressable>
-        </View>
         <GreetingHeader
           name={name}
           location={locationLabel}
           locationLoading={locationLoading}
-          onEditName={() => setNameModalOpen(true)}
+          onOpenProfile={() => router.push("/profile")}
         />
 
         <View style={{ height: 18 }} />
@@ -498,15 +479,6 @@ export default function HomeScreen() {
         ) : null}
       </ScrollView>
 
-      <NameModal
-        visible={nameModalOpen}
-        initialName={name}
-        onClose={() => setNameModalOpen(false)}
-        onSave={(next) => {
-          void setName(next);
-        }}
-      />
-
       <PreferencesModal
         visible={prefsModalOpen}
         initialThreshold={hasDirtyThreshold ? dirtyThreshold : null}
@@ -532,19 +504,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    marginBottom: 12,
-  },
-  profileBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-  },
   sectionLabel: {
     marginTop: 26,
     marginBottom: 12,

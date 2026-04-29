@@ -10,7 +10,7 @@ interface Props {
   location?: string | null;
   locationLoading?: boolean;
   date?: Date;
-  onEditName?: () => void;
+  onOpenProfile?: () => void;
 }
 
 function formatDay(date: Date): string {
@@ -22,7 +22,7 @@ export function GreetingHeader({
   location,
   locationLoading,
   date = new Date(),
-  onEditName,
+  onOpenProfile,
 }: Props) {
   const colors = useColors();
   const greeting = buildGreeting(name ?? null, date);
@@ -33,22 +33,17 @@ export function GreetingHeader({
 
   return (
     <View>
-      <Text style={[styles.kicker, { color: colors.mutedForeground }]}>
-        Wearwise
-      </Text>
-      <View style={styles.greetingRow}>
-        <Text
-          style={[styles.greeting, { color: colors.foreground }]}
-          numberOfLines={2}
-        >
-          {greeting}
+      <View style={styles.kickerRow}>
+        <Text style={[styles.kicker, { color: colors.mutedForeground }]}>
+          Wearwise
         </Text>
-        {onEditName ? (
+        {onOpenProfile ? (
           <Pressable
-            onPress={onEditName}
+            onPress={onOpenProfile}
             hitSlop={10}
+            accessibilityLabel="Open profile"
             style={({ pressed }) => [
-              styles.editBtn,
+              styles.profileBtn,
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
@@ -56,14 +51,16 @@ export function GreetingHeader({
               },
             ]}
           >
-            <Feather
-              name={name ? "edit-2" : "user-plus"}
-              size={14}
-              color={colors.mutedForeground}
-            />
+            <Feather name="user" size={16} color={colors.foreground} />
           </Pressable>
         ) : null}
       </View>
+      <Text
+        style={[styles.greeting, { color: colors.foreground }]}
+        numberOfLines={2}
+      >
+        {greeting}
+      </Text>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
         {subtitle}
       </Text>
@@ -72,31 +69,30 @@ export function GreetingHeader({
 }
 
 const styles = StyleSheet.create({
+  kickerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
   kicker: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
     letterSpacing: 1.5,
     textTransform: "uppercase",
-    marginBottom: 6,
   },
-  greetingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  greeting: {
-    flex: 1,
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.5,
-  },
-  editBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  profileBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  greeting: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.5,
   },
   subtitle: {
     marginTop: 4,
