@@ -14,6 +14,7 @@ interface ItemTileProps {
 
 export function ItemTile({ item, onPress, selected, width }: ItemTileProps) {
   const colors = useColors();
+  const isDirty = item.status === "dirty";
   return (
     <Pressable
       onPress={onPress}
@@ -24,7 +25,7 @@ export function ItemTile({ item, onPress, selected, width }: ItemTileProps) {
           backgroundColor: colors.card,
           borderColor: selected ? colors.primary : colors.border,
           borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
-          opacity: pressed ? 0.85 : 1,
+          opacity: pressed ? 0.85 : isDirty ? 0.65 : 1,
         },
       ]}
     >
@@ -35,6 +36,13 @@ export function ItemTile({ item, onPress, selected, width }: ItemTileProps) {
           contentFit="cover"
           transition={150}
         />
+        {isDirty ? (
+          <View style={[styles.badge, { backgroundColor: colors.foreground }]}>
+            <Text style={[styles.badgeText, { color: colors.background }]}>
+              Dirty
+            </Text>
+          </View>
+        ) : null}
       </View>
       <View style={styles.meta}>
         <Text
@@ -62,10 +70,25 @@ const styles = StyleSheet.create({
   imageWrap: {
     aspectRatio: 1,
     width: "100%",
+    position: "relative",
   },
   image: {
     width: "100%",
     height: "100%",
+  },
+  badge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
   meta: {
     paddingHorizontal: 10,

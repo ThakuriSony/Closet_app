@@ -1,0 +1,176 @@
+You are a senior full-stack engineer.
+
+We are extending an existing React Native (Expo) app called “Wearwise”.
+
+CURRENT STATE:
+- Users can add clothing items
+- Generate outfits
+- Events + Home screen exist
+
+---
+
+GOAL OF THIS PHASE:
+
+Add a Laundry Tracking System including:
+
+1. User preferences (style + dirty threshold)
+2. Wear tracking system
+3. Automatic dirty state logic
+4. Laundry pile view
+5. Integration with outfit usage
+
+---
+
+IMPORTANT:
+DO NOT break existing flows.
+DO NOT overcomplicate.
+Keep logic clean and deterministic.
+
+---
+
+1. UPDATE USER MODEL
+
+Add fields:
+
+- style_preference (string)
+- dirty_threshold (number: 1–5)
+
+---
+
+2. UPDATE CLOTHING ITEM MODEL
+
+Add:
+
+- wear_count (number, default 0)
+- status ("clean" | "dirty", default "clean")
+- lastWorn (timestamp)
+
+---
+
+3. USER PREFERENCE SETUP (LIGHT ONBOARDING)
+
+If user does not have preferences:
+
+Show modal:
+
+Fields:
+- Style preference (chips: Casual, Formal, Streetwear, Minimalist)
+- Dirty threshold (1–5 selector)
+
+Save to user profile.
+
+---
+
+4. WEAR TRACKING (CRITICAL)
+
+Add a new action:
+
+Button: “Wear This Outfit”
+
+When pressed:
+- Loop through outfit items
+- Increment wear_count for each
+
+Logic:
+if wear_count >= dirty_threshold:
+→ set status = "dirty"
+
+Also update lastWorn timestamp
+
+---
+
+IMPORTANT:
+DO NOT increment wear_count when outfit is generated.
+ONLY when user confirms wearing it.
+
+---
+
+5. UPDATE OUTFIT ENGINE
+
+Modify logic:
+
+- Exclude items where status = "dirty"
+
+If not enough items:
+→ fallback to include dirty items
+
+---
+
+6. LAUNDRY VIEW
+
+Create new section inside Closet screen:
+
+Tab toggle:
+- Closet
+- Laundry
+
+Laundry shows:
+- Items where status = "dirty"
+
+Each item has:
+Button: “Mark as Washed”
+
+---
+
+7. MARK AS WASHED LOGIC
+
+When pressed:
+- wear_count = 0
+- status = "clean"
+
+Move item back to Closet view
+
+---
+
+8. UI UPDATES
+
+Closet items:
+- Show badge if dirty (e.g. “Dirty”)
+- Optional: reduce opacity
+
+---
+
+9. EDGE CASES
+
+- If user has no clean items:
+→ show message:
+“All items are in laundry”
+
+- If preferences missing:
+→ force setup modal
+
+---
+
+10. CODE STRUCTURE
+
+Update:
+
+/services/outfitEngine.ts
+/services/userService.ts
+/services/clothingService.ts
+
+Update screens:
+- HomeScreen (add “Wear This Outfit” button)
+- ClosetScreen (add Laundry tab)
+
+---
+
+OUTPUT:
+
+1. Updated data models
+2. New UI components
+3. Wear tracking logic
+4. Laundry view
+5. Testing steps
+
+---
+
+CONSTRAINTS:
+
+- DO NOT auto-track wear without user action
+- DO NOT overdesign UI
+- Keep logic simple and reliable
+
+---
+
+Start implementing now.

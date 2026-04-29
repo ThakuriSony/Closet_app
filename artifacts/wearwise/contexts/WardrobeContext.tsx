@@ -17,6 +17,21 @@ function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
+// Backfill laundry fields on items saved before Phase 6.
+function normalizeItem(raw: Partial<ClothingItem> & { id: string }): ClothingItem {
+  return {
+    id: raw.id,
+    imageUri: raw.imageUri ?? "",
+    category: (raw.category ?? "Top") as Category,
+    color: raw.color ?? "",
+    tags: raw.tags ?? [],
+    createdAt: raw.createdAt ?? Date.now(),
+    wearCount: typeof raw.wearCount === "number" ? raw.wearCount : 0,
+    status: raw.status === "dirty" ? "dirty" : "clean",
+    lastWorn: typeof raw.lastWorn === "number" ? raw.lastWorn : null,
+  };
+}
+
 interface WardrobeContextValue {
   items: ClothingItem[];
   outfits: Outfit[];
@@ -31,6 +46,11 @@ interface WardrobeContextValue {
   getItem: (id: string) => ClothingItem | undefined;
   addOutfit: (itemIds: string[]) => Promise<Outfit>;
   removeOutfit: (id: string) => Promise<void>;
+  markItemsWorn: (
+    itemIds: string[],
+    dirtyThreshold: number,
+  ) => Promise<void>;
+  markItemWashed: (id: string) => Promise<void>;
 }
 
 const WardrobeContext = createContext<WardrobeContextValue | null>(null);
@@ -47,7 +67,12 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(ITEMS_KEY),
           AsyncStorage.getItem(OUTFITS_KEY),
         ]);
-        if (rawItems) setItems(JSON.parse(rawItems));
+        if (rawItems) {
+          const parsed = JSON.parse(rawItems) as Array<
+            Partial<ClothingItem> & { id: string }
+          >;
+          setItems(parsed.map(normalizeItem));
+        }
         if (rawOutfits) setOutfits(JSON.parse(rawOutfits));
       } catch {
         // ignore
@@ -76,6 +101,9 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         color: input.color,
         tags: input.tags,
         createdAt: Date.now(),
+        wearCount: 0,
+        status: "clean",
+        lastWorn: null,
       };
       const next = [item, ...items];
       await persistItems(next);
@@ -123,6 +151,34 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     [outfits, persistOutfits],
   );
 
+  const markItemsWorn = useCallback<WardrobeContextValue["markItemsWorn"]>(
+    async (itemIds, dirtyThreshold) => {
+      const ids = new Set(itemIds);
+      const now = Date.now();
+      const next = items.map((it) => {
+        if (!ids.has(it.id)) return it;
+        const wearCount = it.wearCount + 1;
+        const status =
+          wearCount >= dirtyThreshold ? ("dirty" as const) : it.status;
+        return { ...it, wearCount, status, lastWorn: now };
+      });
+      await persistItems(next);
+    },
+    [items, persistItems],
+  );
+
+  const markItemWashed = useCallback<WardrobeContextValue["markItemWashed"]>(
+    async (id) => {
+      const next = items.map((it) =>
+        it.id === id
+          ? { ...it, wearCount: 0, status: "clean" as const }
+          : it,
+      );
+      await persistItems(next);
+    },
+    [items, persistItems],
+  );
+
   const value = useMemo<WardrobeContextValue>(
     () => ({
       items,
@@ -133,8 +189,21 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       getItem,
       addOutfit,
       removeOutfit,
+      markItemsWorn,
+      markItemWashed,
     }),
-    [items, outfits, loading, addItem, removeItem, getItem, addOutfit, removeOutfit],
+    [
+      items,
+      outfits,
+      loading,
+      addItem,
+      removeItem,
+      getItem,
+      addOutfit,
+      removeOutfit,
+      markItemsWorn,
+      markItemWashed,
+    ],
   );
 
   return (

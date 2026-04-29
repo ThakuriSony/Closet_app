@@ -143,33 +143,74 @@ function pickBest(
   return top;
 }
 
+function pickBestFor(
+  items: ClothingItem[],
+  category: Category,
+  occasion: Occasion,
+  weather: WeatherBucket,
+  freq: Map<string, number>,
+): { item: ClothingItem | undefined; usedDirty: boolean } {
+  const clean = items.filter((i) => i.status !== "dirty");
+  const cleanPick = pickBest(clean, category, occasion, weather, freq);
+  if (cleanPick) return { item: cleanPick, usedDirty: false };
+
+  // Fallback: relax the dirty filter if no clean candidate exists.
+  const dirtyPick = pickBest(items, category, occasion, weather, freq);
+  return { item: dirtyPick, usedDirty: Boolean(dirtyPick) };
+}
+
+export interface GenerateOutfitResult extends GeneratedOutfit {
+  usedDirty: boolean;
+}
+
 export function generateOutfit(
   items: ClothingItem[],
   occasion: Occasion,
   weather: WeatherBucket,
   eventCategory?: EventCategory,
-): GeneratedOutfit {
-  // If an event category is provided, it overrides the selected occasion.
+): GenerateOutfitResult {
   const effectiveOccasion: Occasion = eventCategory
     ? occasionForEvent(eventCategory)
     : occasion;
 
   const freq = buildTagFrequency(items);
 
-  const top = pickBest(items, "Top", effectiveOccasion, weather, freq);
-  const bottom = pickBest(items, "Bottom", effectiveOccasion, weather, freq);
-  const shoes = pickBest(items, "Shoes", effectiveOccasion, weather, freq);
+  const top = pickBestFor(items, "Top", effectiveOccasion, weather, freq);
+  const bottom = pickBestFor(items, "Bottom", effectiveOccasion, weather, freq);
+  const shoes = pickBestFor(items, "Shoes", effectiveOccasion, weather, freq);
 
-  let outerwear: ClothingItem | undefined;
+  let outerwear: { item: ClothingItem | undefined; usedDirty: boolean } = {
+    item: undefined,
+    usedDirty: false,
+  };
   if (weather !== "Hot") {
-    outerwear = pickBest(items, "Outerwear", effectiveOccasion, weather, freq);
+    outerwear = pickBestFor(
+      items,
+      "Outerwear",
+      effectiveOccasion,
+      weather,
+      freq,
+    );
   }
 
   const missing: Category[] = [];
-  if (!top) missing.push("Top");
-  if (!bottom) missing.push("Bottom");
-  if (!shoes) missing.push("Shoes");
-  if (weather === "Cold" && !outerwear) missing.push("Outerwear");
+  if (!top.item) missing.push("Top");
+  if (!bottom.item) missing.push("Bottom");
+  if (!shoes.item) missing.push("Shoes");
+  if (weather === "Cold" && !outerwear.item) missing.push("Outerwear");
 
-  return { top, bottom, shoes, outerwear, missing };
+  const usedDirty =
+    top.usedDirty ||
+    bottom.usedDirty ||
+    shoes.usedDirty ||
+    outerwear.usedDirty;
+
+  return {
+    top: top.item,
+    bottom: bottom.item,
+    shoes: shoes.item,
+    outerwear: outerwear.item,
+    missing,
+    usedDirty,
+  };
 }

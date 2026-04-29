@@ -17,6 +17,7 @@ import { GreetingHeader } from "@/components/GreetingHeader";
 import { NameModal } from "@/components/NameModal";
 import { OccasionTabs } from "@/components/OccasionTabs";
 import { OutfitPreview } from "@/components/OutfitPreview";
+import { PreferencesModal } from "@/components/PreferencesModal";
 import { UpcomingEventCard } from "@/components/UpcomingEventCard";
 import { WeatherCard } from "@/components/WeatherCard";
 import { useEvents } from "@/contexts/EventsContext";
@@ -31,7 +32,7 @@ import {
 import {
   generateOutfit,
   occasionForEvent,
-  type GeneratedOutfit,
+  type GenerateOutfitResult,
   type Occasion,
 } from "@/services/outfitEngine";
 import { explainOutfit } from "@/services/outfitExplain";
@@ -48,8 +49,16 @@ const H_PADDING = 20;
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { items, addOutfit } = useWardrobe();
-  const { name, setName } = useProfile();
+  const { items, addOutfit, markItemsWorn } = useWardrobe();
+  const {
+    name,
+    setName,
+    stylePreference,
+    dirtyThreshold,
+    preferencesCompleted,
+    loading: profileLoading,
+    setPreferences,
+  } = useProfile();
   const { events } = useEvents();
 
   const [occasion, setOccasion] = useState<Occasion>("Casual");
@@ -62,11 +71,20 @@ export default function HomeScreen() {
   const [weatherFailed, setWeatherFailed] = useState<boolean>(false);
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState<boolean>(true);
-  const [outfit, setOutfit] = useState<GeneratedOutfit | null>(null);
+  const [outfit, setOutfit] = useState<GenerateOutfitResult | null>(null);
   const [explanation, setExplanation] = useState<string>("");
   const [explaining, setExplaining] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
+  const [worn, setWorn] = useState<boolean>(false);
   const [nameModalOpen, setNameModalOpen] = useState<boolean>(false);
+  const [prefsModalOpen, setPrefsModalOpen] = useState<boolean>(false);
+
+  // Show preferences setup the first time the user opens Home.
+  useEffect(() => {
+    if (!profileLoading && !preferencesCompleted) {
+      setPrefsModalOpen(true);
+    }
+  }, [profileLoading, preferencesCompleted]);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const tabBarOffset = Platform.OS === "web" ? 100 : 110;
@@ -133,6 +151,7 @@ export default function HomeScreen() {
       );
       setOutfit(result);
       setExplanation("");
+      setWorn(false);
       if (
         result.top &&
         result.bottom &&
@@ -180,15 +199,19 @@ export default function HomeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [occasion]);
 
-  const onSaveOutfit = async () => {
-    if (!outfit) return;
-    const ids = [outfit.top, outfit.bottom, outfit.shoes, outfit.outerwear]
+  const outfitItemIds = useMemo(() => {
+    if (!outfit) return [] as string[];
+    return [outfit.top, outfit.bottom, outfit.shoes, outfit.outerwear]
       .filter((i): i is NonNullable<typeof i> => Boolean(i))
       .map((i) => i.id);
-    if (ids.length < 3) return;
+  }, [outfit]);
+
+  const onSaveOutfit = async () => {
+    if (!outfit) return;
+    if (outfitItemIds.length < 3) return;
     setSaving(true);
     try {
-      await addOutfit(ids);
+      await addOutfit(outfitItemIds);
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -197,8 +220,19 @@ export default function HomeScreen() {
     }
   };
 
+  const onWearOutfit = async () => {
+    if (worn) return;
+    if (outfitItemIds.length === 0) return;
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    await markItemsWorn(outfitItemIds, dirtyThreshold);
+    setWorn(true);
+  };
+
   const isOutfitComplete =
     outfit && outfit.top && outfit.bottom && outfit.shoes;
+  const noCleanItems = outfit !== null && outfit.usedDirty;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -279,6 +313,27 @@ export default function HomeScreen() {
 
         <OutfitPreview outfit={outfit} />
 
+        {noCleanItems ? (
+          <View
+            style={[
+              styles.notice,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                marginTop: 12,
+                marginBottom: 0,
+              },
+            ]}
+          >
+            <Feather name="droplet" size={16} color={colors.mutedForeground} />
+            <Text
+              style={[styles.noticeText, { color: colors.mutedForeground }]}
+            >
+              Some clean items were missing — we filled in from your laundry pile.
+            </Text>
+          </View>
+        ) : null}
+
         {outfit && outfit.missing.length > 0 ? (
           <Text style={[styles.missingText, { color: colors.mutedForeground }]}>
             Missing: {outfit.missing.join(", ")}. Add more items to your closet
@@ -354,6 +409,35 @@ export default function HomeScreen() {
 
         {isOutfitComplete ? (
           <Pressable
+            onPress={onWearOutfit}
+            disabled={worn}
+            style={({ pressed }) => [
+              styles.wearBtn,
+              {
+                backgroundColor: worn ? colors.card : colors.foreground,
+                borderColor: colors.foreground,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Feather
+              name={worn ? "check" : "user-check"}
+              size={16}
+              color={worn ? colors.foreground : colors.background}
+            />
+            <Text
+              style={[
+                styles.wearLabel,
+                { color: worn ? colors.foreground : colors.background },
+              ]}
+            >
+              {worn ? "Marked as worn" : "Wear This Outfit"}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {isOutfitComplete ? (
+          <Pressable
             onPress={onSaveOutfit}
             disabled={saving}
             style={({ pressed }) => [
@@ -405,6 +489,18 @@ export default function HomeScreen() {
         onClose={() => setNameModalOpen(false)}
         onSave={(next) => {
           void setName(next);
+        }}
+      />
+
+      <PreferencesModal
+        visible={prefsModalOpen}
+        initialStyle={stylePreference}
+        initialThreshold={dirtyThreshold}
+        required={!preferencesCompleted}
+        onClose={() => setPrefsModalOpen(false)}
+        onSave={async (input) => {
+          await setPreferences(input);
+          setPrefsModalOpen(false);
         }}
       />
     </View>
@@ -483,6 +579,20 @@ const styles = StyleSheet.create({
   },
   generateLabel: {
     fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
+  wearBtn: {
+    marginTop: 10,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  wearLabel: {
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
   },
   saveBtn: {

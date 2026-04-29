@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -12,29 +13,45 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { CategoryPicker } from "@/components/CategoryPicker";
 import { EmptyState } from "@/components/EmptyState";
 import { ItemTile } from "@/components/ItemTile";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
-import { CATEGORIES, type Category } from "@/types";
+import { CATEGORIES, type Category, type ClothingItem } from "@/types";
 
 const COLUMN_COUNT = 2;
 const GAP = 14;
 const H_PADDING = 20;
 
 type Filter = "All" | Category;
+type ViewMode = "Closet" | "Laundry";
 
 export default function ClosetScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { items } = useWardrobe();
+  const { items, markItemWashed } = useWardrobe();
   const [filter, setFilter] = useState<Filter>("All");
+  const [mode, setMode] = useState<ViewMode>("Closet");
+
+  const dirtyCount = useMemo(
+    () => items.filter((i) => i.status === "dirty").length,
+    [items],
+  );
+
+  const cleanItems = useMemo(
+    () => items.filter((i) => i.status !== "dirty"),
+    [items],
+  );
+
+  const dirtyItems = useMemo(
+    () => items.filter((i) => i.status === "dirty"),
+    [items],
+  );
 
   const filtered = useMemo(() => {
-    if (filter === "All") return items;
-    return items.filter((i) => i.category === filter);
-  }, [items, filter]);
+    if (filter === "All") return cleanItems;
+    return cleanItems.filter((i) => i.category === filter);
+  }, [cleanItems, filter]);
 
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const tileWidth =
@@ -69,7 +86,7 @@ export default function ClosetScreen() {
             Wearwise
           </Text>
           <Text style={[styles.title, { color: colors.foreground }]}>
-            My Closet
+            {mode === "Closet" ? "My Closet" : "Laundry"}
           </Text>
         </View>
         <Pressable
@@ -86,48 +103,207 @@ export default function ClosetScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.filterRow}>
-        <FilterChips value={filter} onChange={setFilter} />
+      <View style={styles.modeRow}>
+        <ModeToggle
+          value={mode}
+          onChange={setMode}
+          dirtyCount={dirtyCount}
+        />
       </View>
 
-      {items.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <EmptyState
-            icon="package"
-            title="Your closet is empty"
-            description="Tap the + button to add your first clothing item."
-          />
-        </View>
+      {mode === "Closet" ? (
+        <>
+          <View style={styles.filterRow}>
+            <FilterChips value={filter} onChange={setFilter} />
+          </View>
+
+          {items.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <EmptyState
+                icon="package"
+                title="Your closet is empty"
+                description="Tap the + button to add your first clothing item."
+              />
+            </View>
+          ) : cleanItems.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <EmptyState
+                icon="droplet"
+                title="All items are in laundry"
+                description="Mark items as washed in the Laundry tab to bring them back here."
+              />
+            </View>
+          ) : (
+            <FlatList
+              data={filtered}
+              keyExtractor={(i) => i.id}
+              numColumns={COLUMN_COUNT}
+              columnWrapperStyle={{ gap: GAP }}
+              contentContainerStyle={{
+                paddingHorizontal: H_PADDING,
+                paddingTop: 4,
+                paddingBottom: insets.bottom + tabBarOffset,
+                gap: GAP,
+              }}
+              renderItem={({ item }) => (
+                <ItemTile
+                  item={item}
+                  width={tileWidth}
+                  onPress={() => router.push(`/item/${item.id}`)}
+                />
+              )}
+              ListEmptyComponent={
+                <View style={{ paddingTop: 60 }}>
+                  <EmptyState
+                    icon="filter"
+                    title={`No ${filter.toLowerCase()} items`}
+                    description="Try a different filter or add a new item."
+                  />
+                </View>
+              }
+            />
+          )}
+        </>
       ) : (
         <FlatList
-          data={filtered}
+          data={dirtyItems}
           keyExtractor={(i) => i.id}
-          numColumns={COLUMN_COUNT}
-          columnWrapperStyle={{ gap: GAP }}
           contentContainerStyle={{
             paddingHorizontal: H_PADDING,
             paddingTop: 4,
             paddingBottom: insets.bottom + tabBarOffset,
-            gap: GAP,
+            gap: 12,
           }}
           renderItem={({ item }) => (
-            <ItemTile
+            <LaundryRow
               item={item}
-              width={tileWidth}
-              onPress={() => router.push(`/item/${item.id}`)}
+              onWash={() => {
+                if (Platform.OS !== "web") {
+                  Haptics.notificationAsync(
+                    Haptics.NotificationFeedbackType.Success,
+                  );
+                }
+                void markItemWashed(item.id);
+              }}
             />
           )}
           ListEmptyComponent={
-            <View style={{ paddingTop: 60 }}>
+            <View style={{ paddingTop: 80 }}>
               <EmptyState
-                icon="filter"
-                title={`No ${filter.toLowerCase()} items`}
-                description="Try a different filter or add a new item."
+                icon="check-circle"
+                title="Laundry pile is empty"
+                description="Items move here automatically once you wear them past your set threshold."
               />
             </View>
           }
         />
       )}
+    </View>
+  );
+}
+
+function ModeToggle({
+  value,
+  onChange,
+  dirtyCount,
+}: {
+  value: ViewMode;
+  onChange: (m: ViewMode) => void;
+  dirtyCount: number;
+}) {
+  const colors = useColors();
+  const options: ViewMode[] = ["Closet", "Laundry"];
+  return (
+    <View
+      style={[
+        styles.modeWrap,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
+      {options.map((opt) => {
+        const active = opt === value;
+        return (
+          <Pressable
+            key={opt}
+            onPress={() => onChange(opt)}
+            style={({ pressed }) => [
+              styles.modeBtn,
+              {
+                backgroundColor: active
+                  ? colors.foreground
+                  : "transparent",
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.modeText,
+                {
+                  color: active ? colors.background : colors.mutedForeground,
+                },
+              ]}
+            >
+              {opt}
+              {opt === "Laundry" && dirtyCount > 0
+                ? ` · ${dirtyCount}`
+                : ""}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function LaundryRow({
+  item,
+  onWash,
+}: {
+  item: ClothingItem;
+  onWash: () => void;
+}) {
+  const colors = useColors();
+  return (
+    <View
+      style={[
+        styles.laundryRow,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
+      <View style={[styles.thumb, { backgroundColor: colors.secondary }]}>
+        <Image
+          source={{ uri: item.imageUri }}
+          style={{ width: "100%", height: "100%" }}
+          contentFit="cover"
+        />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.laundryTitle, { color: colors.foreground }]}>
+          {item.category}
+          {item.color ? ` · ${item.color}` : ""}
+        </Text>
+        <Text
+          style={[styles.laundryMeta, { color: colors.mutedForeground }]}
+        >
+          Worn {item.wearCount} {item.wearCount === 1 ? "time" : "times"}
+        </Text>
+      </View>
+      <Pressable
+        onPress={onWash}
+        style={({ pressed }) => [
+          styles.washBtn,
+          {
+            borderColor: colors.primary,
+            opacity: pressed ? 0.85 : 1,
+          },
+        ]}
+      >
+        <Feather name="droplet" size={14} color={colors.primary} />
+        <Text style={[styles.washLabel, { color: colors.primary }]}>
+          Mark as Washed
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -143,7 +319,7 @@ function FilterChips({
   const all: Filter[] = ["All", ...CATEGORIES];
   return (
     <View style={{ paddingHorizontal: H_PADDING }}>
-      <CategoryChipsRow>
+      <View style={styles.chipRow}>
         {all.map((c) => {
           const active = value === c;
           return (
@@ -172,15 +348,7 @@ function FilterChips({
             </Pressable>
           );
         })}
-      </CategoryChipsRow>
-    </View>
-  );
-}
-
-function CategoryChipsRow({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={styles.chipRow}>
-      {children}
+      </View>
     </View>
   );
 }
@@ -189,7 +357,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingHorizontal: H_PADDING,
-    paddingBottom: 16,
+    paddingBottom: 14,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
@@ -213,6 +381,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  modeRow: {
+    paddingHorizontal: H_PADDING,
+    paddingBottom: 12,
+  },
+  modeWrap: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 999,
+  },
+  modeText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
   filterRow: {
     paddingBottom: 14,
   },
@@ -233,5 +421,41 @@ const styles = StyleSheet.create({
   },
   emptyWrap: {
     flex: 1,
+  },
+  laundryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  thumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  laundryTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  laundryMeta: {
+    marginTop: 2,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  washBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  washLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
   },
 });

@@ -8,6 +8,8 @@ export const CATEGORIES: Category[] = [
   "Accessories",
 ];
 
+export type ItemStatus = "clean" | "dirty";
+
 export interface ClothingItem {
   id: string;
   imageUri: string;
@@ -15,7 +17,27 @@ export interface ClothingItem {
   color: string;
   tags: string[];
   createdAt: number;
+  wearCount: number;
+  status: ItemStatus;
+  lastWorn: number | null;
 }
+
+export type StylePreference =
+  | "Casual"
+  | "Formal"
+  | "Streetwear"
+  | "Minimalist";
+
+export const STYLE_PREFERENCES: StylePreference[] = [
+  "Casual",
+  "Formal",
+  "Streetwear",
+  "Minimalist",
+];
+
+export const DIRTY_THRESHOLD_MIN = 1;
+export const DIRTY_THRESHOLD_MAX = 5;
+export const DIRTY_THRESHOLD_DEFAULT = 2;
 
 export interface Outfit {
   id: string;
