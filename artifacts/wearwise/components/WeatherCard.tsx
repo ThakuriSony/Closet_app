@@ -59,12 +59,10 @@ export function WeatherCard({ weather, loading, failed }: Props) {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.temp, { color: colors.foreground }]}>
-          {weather.tempC}°C · {weather.condition}
+          {weather.minTemp}°C → {weather.maxTemp}°C · {weather.condition}
         </Text>
         <Text style={[styles.recommendation, { color: colors.mutedForeground }]}>
-          {weather.feelsLikeC !== weather.tempC
-            ? `Feels like ${weather.feelsLikeC}°C · ${weather.recommendation}`
-            : weather.recommendation}
+          {weather.smartMessage}
           {failed ? " · estimate" : ""}
         </Text>
       </View>

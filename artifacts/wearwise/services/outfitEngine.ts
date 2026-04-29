@@ -1,5 +1,9 @@
 import type { Category, ClothingItem, EventCategory } from "@/types";
-import type { WeatherBucket } from "@/services/weatherService";
+import {
+  bucketForTemp,
+  type WeatherBucket,
+  type WeatherInfo,
+} from "@/services/weatherService";
 
 export type Occasion = "Work" | "Casual" | "Gym" | "Party" | "Formal";
 export const OCCASIONS: Occasion[] = [
@@ -163,10 +167,35 @@ export interface GenerateOutfitResult extends GeneratedOutfit {
   usedDirty: boolean;
 }
 
+// Decide whether outerwear should be REQUIRED, OPTIONAL or OMITTED based on
+// the day's full forecast. This is what makes the engine robust for places
+// where mornings are cold but afternoons are hot.
+type OuterwearRule = "required" | "optional" | "omit";
+
+function outerwearRule(
+  minTemp: number,
+  maxTemp: number,
+  tempRange: number,
+): OuterwearRule {
+  if (maxTemp < 10) return "required"; // cold all day → heavy outerwear
+  if (minTemp > 20) return "omit"; // hot all day → no outerwear
+  if (tempRange > 10) return "required"; // big swing → removable layer
+  return "optional"; // moderate → optional layering
+}
+
+// For weather-tag scoring we want the engine to prefer items that suit the
+// warmest part of the day (when most people are out), but for outerwear it
+// makes more sense to bias toward the colder reading.
+function bucketForOuterwear(minTemp: number, maxTemp: number): WeatherBucket {
+  if (maxTemp < 10) return "Cold";
+  if (minTemp > 20) return "Hot";
+  return bucketForTemp(Math.round((minTemp + maxTemp) / 2));
+}
+
 export function generateOutfit(
   items: ClothingItem[],
   occasion: Occasion,
-  weather: WeatherBucket,
+  weather: WeatherInfo,
   eventCategory?: EventCategory,
 ): GenerateOutfitResult {
   const effectiveOccasion: Occasion = eventCategory
@@ -175,20 +204,46 @@ export function generateOutfit(
 
   const freq = buildTagFrequency(items);
 
-  const top = pickBestFor(items, "Top", effectiveOccasion, weather, freq);
-  const bottom = pickBestFor(items, "Bottom", effectiveOccasion, weather, freq);
-  const shoes = pickBestFor(items, "Shoes", effectiveOccasion, weather, freq);
+  // Daytime (max-temp) bucket biases tops/bottoms/shoes toward what works
+  // when the user is actually out and about.
+  const bodyBucket: WeatherBucket = bucketForTemp(weather.maxTemp);
+  const outerBucket: WeatherBucket = bucketForOuterwear(
+    weather.minTemp,
+    weather.maxTemp,
+  );
+
+  const top = pickBestFor(items, "Top", effectiveOccasion, bodyBucket, freq);
+  const bottom = pickBestFor(
+    items,
+    "Bottom",
+    effectiveOccasion,
+    bodyBucket,
+    freq,
+  );
+  const shoes = pickBestFor(
+    items,
+    "Shoes",
+    effectiveOccasion,
+    bodyBucket,
+    freq,
+  );
+
+  const rule = outerwearRule(
+    weather.minTemp,
+    weather.maxTemp,
+    weather.tempRange,
+  );
 
   let outerwear: { item: ClothingItem | undefined; usedDirty: boolean } = {
     item: undefined,
     usedDirty: false,
   };
-  if (weather !== "Hot") {
+  if (rule !== "omit") {
     outerwear = pickBestFor(
       items,
       "Outerwear",
       effectiveOccasion,
-      weather,
+      outerBucket,
       freq,
     );
   }
@@ -197,7 +252,7 @@ export function generateOutfit(
   if (!top.item) missing.push("Top");
   if (!bottom.item) missing.push("Bottom");
   if (!shoes.item) missing.push("Shoes");
-  if (weather === "Cold" && !outerwear.item) missing.push("Outerwear");
+  if (rule === "required" && !outerwear.item) missing.push("Outerwear");
 
   const usedDirty =
     top.usedDirty ||

@@ -40,6 +40,7 @@ import {
   DEFAULT_LOCATION,
   FALLBACK_WEATHER,
   fetchWeather,
+  weatherForEventTime,
   type WeatherInfo,
 } from "@/services/weatherService";
 import type { EventCategory, WearEvent } from "@/types";
@@ -140,10 +141,21 @@ export default function HomeScreen() {
       if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
+      const eventForWeather =
+        overrideCategory && eventOverride
+          ? eventOverride.event
+          : eventOverride?.event;
+      const eventTimeMs = eventForWeather
+        ? new Date(eventForWeather.dateTime).getTime()
+        : NaN;
+      const weatherForGen =
+        eventForWeather && !Number.isNaN(eventTimeMs)
+          ? weatherForEventTime(weather, eventTimeMs)
+          : weather;
       const result = generateOutfit(
         items,
         occasion,
-        weather.bucket,
+        weatherForGen,
         overrideCategory ?? eventOverride?.category,
       );
       setOutfit(result);
@@ -160,7 +172,7 @@ export default function HomeScreen() {
           : effectiveOccasion;
         setExplaining(true);
         try {
-          const text = await explainOutfit(result, occForExplain, weather);
+          const text = await explainOutfit(result, occForExplain, weatherForGen);
           setExplanation(text);
         } catch {
           setExplanation("");
@@ -189,7 +201,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (eventOverride) return;
     if (outfit && weather) {
-      const result = generateOutfit(items, occasion, weather.bucket);
+      const result = generateOutfit(items, occasion, weather);
       setOutfit(result);
       setExplanation("");
     }

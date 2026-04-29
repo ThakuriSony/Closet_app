@@ -1,0 +1,151 @@
+You are a senior full-stack engineer.
+
+We are refining the weather system in the Wearwise app to make outfit recommendations more reliable across the entire day.
+
+IMPORTANT:
+We are NOT redesigning the UI.
+We are improving logic and data usage only.
+
+---
+
+CURRENT PROBLEM:
+
+- Weather is based on current temperature only
+- This causes inaccurate outfit suggestions in places with fluctuating temperatures
+
+---
+
+GOAL:
+
+Make weather-aware recommendations based on:
+1. Full-day forecast (min + max temperature)
+2. Temperature variation (range)
+3. Optional event timing
+
+---
+
+1. UPDATE WEATHER SERVICE
+
+Modify API call to fetch:
+
+- current temperature
+- daily min temperature
+- daily max temperature
+- hourly forecast (if available)
+
+Store:
+- currentTemp
+- minTemp
+- maxTemp
+
+---
+
+2. CALCULATE TEMPERATURE RANGE
+
+Create:
+
+tempRange = maxTemp - minTemp
+
+---
+
+3. UPDATE WEATHER DISPLAY (HOME)
+
+Replace current temp display with:
+
+“minTemp° → maxTemp° · condition”
+
+Example:
+“12°C → 24°C · Partly Cloudy”
+
+---
+
+4. ADD SMART WEATHER MESSAGE
+
+Create logic:
+
+If tempRange > 10:
+→ “Layering recommended”
+
+If tempRange between 6–10:
+→ “Mild variation today”
+
+If tempRange < 6:
+→ “Stable weather today”
+
+If maxTemp < 10:
+→ “Dress warm”
+
+If minTemp > 20:
+→ “Keep it light”
+
+Display combined message:
+“12°C → 24°C · Partly Cloudy · Layering recommended”
+
+---
+
+5. UPDATE OUTFIT ENGINE (CRITICAL)
+
+Modify generateOutfit() to use:
+
+- minTemp
+- maxTemp
+- tempRange
+
+Rules:
+
+If tempRange > 10:
+→ include removable outerwear (light jacket, hoodie)
+
+If cold all day (maxTemp < 10):
+→ include heavy outerwear
+
+If hot all day (minTemp > 20):
+→ avoid outerwear
+
+If moderate:
+→ optional layering
+
+---
+
+6. EVENT-BASED WEATHER (OPTIONAL)
+
+If event exists with date/time:
+
+- Use hourly forecast for that time
+- Prioritize that temperature over general day
+
+---
+
+7. FALLBACK
+
+If weather API fails:
+→ default to “Mild variation”
+
+---
+
+8. PERFORMANCE
+
+- Fetch weather once per session
+- Cache result
+- Avoid repeated calls
+
+---
+
+9. OUTPUT
+
+1. Updated weather service
+2. Updated Home screen text
+3. Updated outfit engine logic
+4. Testing steps
+
+---
+
+CONSTRAINTS:
+
+- DO NOT use AI for weather decisions
+- Keep logic deterministic
+- Keep code clean and modular
+
+---
+
+Start implementing now.
