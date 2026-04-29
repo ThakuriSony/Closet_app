@@ -50,10 +50,6 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { items, addOutfit, markItemsWorn } = useWardrobe();
-  const favoriteItems = useMemo(
-    () => items.filter((i) => i.isFavorite).slice(0, 3),
-    [items],
-  );
   const {
     name,
     dirtyThreshold,
@@ -258,33 +254,6 @@ export default function HomeScreen() {
           loading={weatherLoading}
           failed={weatherFailed}
         />
-
-        {favoriteItems.length > 0 ? (
-          <View style={styles.favSection}>
-            <SectionLabel>Your Favorites</SectionLabel>
-            <View style={styles.favRow}>
-              {favoriteItems.map((it) => (
-                <Pressable
-                  key={it.id}
-                  onPress={() => router.push(`/item/${it.id}`)}
-                  style={({ pressed }) => [
-                    styles.favTile,
-                    {
-                      backgroundColor: colors.secondary,
-                      opacity: pressed ? 0.85 : 1,
-                    },
-                  ]}
-                >
-                  <Image
-                    source={{ uri: it.imageUri }}
-                    style={styles.favImg}
-                    contentFit="cover"
-                  />
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
 
         {upcomingEvent ? (
           <UpcomingEventCard
