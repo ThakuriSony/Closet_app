@@ -1,0 +1,192 @@
+You are a senior full-stack engineer.
+
+We are debugging and fixing the AI image tagging feature in the Wearwise app.
+
+CURRENT ISSUE:
+When a user uploads or takes a picture of clothing, the AI auto-tagging does NOT work.
+
+The system should:
+- Analyze image
+- Return category, color, tags
+- Autofill fields
+
+But currently:
+- It fails silently or does nothing
+
+---
+
+GOAL:
+
+Fix the full AI tagging pipeline so that:
+1. Image is correctly captured
+2. Image is correctly sent to AI API
+3. AI returns structured JSON
+4. UI is updated with results
+
+---
+
+1. DEBUG IMAGE INPUT (CRITICAL)
+
+Ensure:
+
+- Image picker returns a valid URI
+- Convert image to correct format for API:
+
+EITHER:
+- base64 string
+
+OR:
+- publicly accessible URL (preferred if using Firebase Storage)
+
+---
+
+2. FIX IMAGE UPLOAD FLOW
+
+Correct flow should be:
+
+Step 1:
+User selects image
+
+Step 2:
+Upload image to Firebase Storage
+
+Step 3:
+Get public download URL
+
+Step 4:
+Send URL to AI API
+
+IMPORTANT:
+Do NOT send local file URI directly to AI
+
+---
+
+3. FIX AI API CALL
+
+Create or update:
+/services/aiTagging.ts
+
+Ensure:
+
+- Proper API key usage (env variable)
+- Correct endpoint for image analysis (vision model)
+
+---
+
+4. STRICT AI PROMPT (VERY IMPORTANT)
+
+Use this EXACT prompt:
+
+"Analyze this clothing item image and return ONLY valid JSON:
+
+{
+  "category": "Top | Bottom | Shoes | Outerwear | Accessories",
+  "color": "string",
+  "tags": ["string", "string"]
+}
+
+Do not include any explanation or extra text."
+
+---
+
+5. HANDLE AI RESPONSE
+
+- Parse response safely
+- Validate JSON
+
+If invalid:
+- retry once
+- else fallback to manual input
+
+---
+
+6. CONNECT TO UI
+
+In Add Item screen:
+
+Flow:
+
+- After image upload:
+  → show loading: “Analyzing image…”
+
+- After response:
+  → autofill:
+    - category
+    - color
+    - tags
+
+---
+
+7. ADD DEBUG LOGS (IMPORTANT)
+
+Log:
+
+- Image URI
+- Uploaded URL
+- API request payload
+- Raw AI response
+- Parsed JSON
+
+This helps identify failures
+
+---
+
+8. ERROR HANDLING
+
+If API fails:
+→ show:
+“Could not analyze image. Please enter details manually.”
+
+DO NOT fail silently
+
+---
+
+9. ASYNC FLOW FIX
+
+Ensure:
+
+- Await API call before updating UI
+- Avoid race conditions
+
+---
+
+10. TESTING
+
+Test these cases:
+
+1. Upload from gallery
+2. Take photo from camera
+3. Slow network
+4. API failure
+5. Invalid JSON response
+
+---
+
+EXPECTED RESULT:
+
+- Image uploads successfully
+- AI returns structured data
+- Fields autofill correctly
+- User can edit and save
+
+---
+
+CONSTRAINTS:
+
+- DO NOT redesign UI
+- DO NOT overcomplicate AI logic
+- Focus only on fixing pipeline
+
+---
+
+OUTPUT:
+
+1. Fixed aiTagging service
+2. Updated AddItem flow
+3. Debug logs added
+4. Error handling added
+5. Testing steps
+
+---
+
+Start debugging and fixing now.

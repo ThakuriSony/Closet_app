@@ -1,0 +1,157 @@
+You are a senior full-stack engineer.
+
+We are extending an existing React Native (Expo) app called “Wearwise”.
+
+CURRENT STATE:
+- Closet (with clean/laundry system)
+- Outfit creation + saved outfits
+- Home screen + outfit generator
+- Events + reminders
+- Firebase backend
+
+---
+
+GOAL OF THIS PHASE:
+
+Add a Favorites system for:
+1. Clothing items
+2. Outfits
+
+Users should be able to:
+- Mark/unmark items as favorite
+- Mark/unmark outfits as favorite
+- View/filter favorites easily
+
+---
+
+IMPORTANT:
+Keep this lightweight.
+DO NOT create a complex system.
+Use simple boolean flags.
+
+---
+
+1. UPDATE DATA MODELS
+
+ClothingItem:
+- add field:
+  isFavorite: boolean (default false)
+
+Outfit:
+- add field:
+  isFavorite: boolean (default false)
+
+---
+
+2. FAVORITE TOGGLE (CLOTHING ITEMS)
+
+In Closet screen:
+
+- Add a star/heart icon on each item card
+- Tap → toggle isFavorite
+
+Behavior:
+- Update Firestore immediately
+- UI updates instantly
+
+---
+
+3. FAVORITE TOGGLE (OUTFITS)
+
+In Outfits screen:
+
+- Add star/heart icon on each outfit
+- Tap → toggle isFavorite
+
+---
+
+4. FAVORITES FILTER / VIEW
+
+Closet screen:
+
+Add a filter toggle at top:
+- “All”
+- “Favorites”
+
+When “Favorites” selected:
+→ show only items where isFavorite = true
+
+---
+
+Outfits screen:
+
+Same filter:
+- “All”
+- “Favorites”
+
+---
+
+5. OPTIONAL (LIGHT UPGRADE)
+
+Home screen:
+
+Add small section:
+“Your Favorites”
+
+- Show 2–3 favorite items or outfits
+- If none:
+→ hide section
+
+---
+
+6. UI REQUIREMENTS
+
+- Use simple icon (⭐ or ❤️)
+- Highlight when active (filled)
+- Keep interaction smooth
+
+---
+
+7. EDGE CASES
+
+If no favorites:
+→ show:
+“No favorites yet”
+
+---
+
+8. CODE STRUCTURE
+
+Update:
+
+/services/clothingService.ts
+/services/outfitService.ts
+
+Update screens:
+- ClosetScreen.tsx
+- OutfitScreen.tsx
+- (optional) HomeScreen.tsx
+
+---
+
+9. PERFORMANCE
+
+- Avoid refetching all data on toggle
+- Update local state optimistically
+
+---
+
+10. CONSTRAINTS
+
+- DO NOT create new collections
+- DO NOT overengineer
+- Keep logic simple and fast
+
+---
+
+OUTPUT:
+
+1. Updated models
+2. UI changes for toggle
+3. Filter implementation
+4. Firestore updates
+5. Testing steps
+
+---
+
+Start implementing favorites now.
