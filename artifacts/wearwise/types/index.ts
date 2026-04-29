@@ -22,19 +22,6 @@ export interface ClothingItem {
   lastWorn: number | null;
 }
 
-export type StylePreference =
-  | "Casual"
-  | "Formal"
-  | "Streetwear"
-  | "Minimalist";
-
-export const STYLE_PREFERENCES: StylePreference[] = [
-  "Casual",
-  "Formal",
-  "Streetwear",
-  "Minimalist",
-];
-
 export const DIRTY_THRESHOLD_MIN = 1;
 export const DIRTY_THRESHOLD_MAX = 5;
 export const DIRTY_THRESHOLD_DEFAULT = 2;

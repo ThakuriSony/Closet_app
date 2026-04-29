@@ -53,6 +53,13 @@ function RootLayoutNav() {
           title: "Item",
         }}
       />
+      <Stack.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          presentation: "modal",
+        }}
+      />
     </Stack>
   );
 }

@@ -89,18 +89,22 @@ export default function ClosetScreen() {
             {mode === "Closet" ? "My Closet" : "Laundry"}
           </Text>
         </View>
-        <Pressable
-          onPress={onAdd}
-          style={({ pressed }) => [
-            styles.addBtn,
-            {
-              backgroundColor: colors.primary,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          <Feather name="plus" size={22} color={colors.primaryForeground} />
-        </Pressable>
+        {mode === "Closet" ? (
+          <Pressable
+            onPress={onAdd}
+            style={({ pressed }) => [
+              styles.addBtn,
+              {
+                backgroundColor: colors.primary,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Feather name="plus" size={22} color={colors.primaryForeground} />
+          </Pressable>
+        ) : (
+          <View style={styles.addBtn} />
+        )}
       </View>
 
       <View style={styles.modeRow}>
@@ -191,7 +195,7 @@ export default function ClosetScreen() {
             <View style={{ paddingTop: 80 }}>
               <EmptyState
                 icon="check-circle"
-                title="Laundry pile is empty"
+                title="No items in laundry"
                 description="Items move here automatically once you wear them past your set threshold."
               />
             </View>

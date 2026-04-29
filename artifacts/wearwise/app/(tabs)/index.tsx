@@ -53,11 +53,10 @@ export default function HomeScreen() {
   const {
     name,
     setName,
-    stylePreference,
     dirtyThreshold,
-    preferencesCompleted,
+    hasDirtyThreshold,
     loading: profileLoading,
-    setPreferences,
+    setDirtyThreshold,
   } = useProfile();
   const { events } = useEvents();
 
@@ -81,10 +80,10 @@ export default function HomeScreen() {
 
   // Show preferences setup the first time the user opens Home.
   useEffect(() => {
-    if (!profileLoading && !preferencesCompleted) {
+    if (!profileLoading && !hasDirtyThreshold) {
       setPrefsModalOpen(true);
     }
-  }, [profileLoading, preferencesCompleted]);
+  }, [profileLoading, hasDirtyThreshold]);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const tabBarOffset = Platform.OS === "web" ? 100 : 110;
@@ -244,6 +243,22 @@ export default function HomeScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.topBar}>
+          <Pressable
+            onPress={() => router.push("/profile")}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.profileBtn,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                opacity: pressed ? 0.6 : 1,
+              },
+            ]}
+          >
+            <Feather name="user" size={16} color={colors.foreground} />
+          </Pressable>
+        </View>
         <GreetingHeader
           name={name}
           location={locationLabel}
@@ -494,12 +509,11 @@ export default function HomeScreen() {
 
       <PreferencesModal
         visible={prefsModalOpen}
-        initialStyle={stylePreference}
-        initialThreshold={dirtyThreshold}
-        required={!preferencesCompleted}
+        initialThreshold={hasDirtyThreshold ? dirtyThreshold : null}
+        required={!hasDirtyThreshold}
         onClose={() => setPrefsModalOpen(false)}
-        onSave={async (input) => {
-          await setPreferences(input);
+        onSave={async (n) => {
+          await setDirtyThreshold(n);
           setPrefsModalOpen(false);
         }}
       />
@@ -518,6 +532,19 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    marginBottom: 12,
+  },
+  profileBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   sectionLabel: {
     marginTop: 26,
     marginBottom: 12,

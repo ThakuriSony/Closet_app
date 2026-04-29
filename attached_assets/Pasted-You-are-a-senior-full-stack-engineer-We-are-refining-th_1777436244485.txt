@@ -1,0 +1,157 @@
+You are a senior full-stack engineer.
+
+We are refining the Laundry system in the Wearwise app.
+
+IMPORTANT:
+This is a cleanup + UX improvement phase.
+Do NOT rebuild features. Modify existing implementation.
+
+---
+
+GOALS:
+
+1. Remove incorrect UI (Add button in Laundry)
+2. Simplify user model (remove style preference)
+3. Improve onboarding (only ask laundry threshold)
+4. Add Profile screen to manage laundry settings
+
+---
+
+1. REMOVE “ADD” BUTTON FROM LAUNDRY
+
+In Closet screen:
+
+- Laundry tab should ONLY display dirty items
+- REMOVE any “Add Item” button from Laundry view
+
+IMPORTANT:
+Adding clothes only happens in Closet → Add Item flow
+
+---
+
+2. REMOVE STYLE PREFERENCE COMPLETELY
+
+- Remove from user model
+- Remove from onboarding modal
+- Remove from any logic or UI
+
+User model should now only include:
+- dirty_threshold
+
+---
+
+3. ONBOARDING UPDATE
+
+If user has no dirty_threshold:
+
+Show onboarding modal:
+
+Question:
+“How many wears before your clothes need washing?”
+
+Options:
+1 → After 1 wear  
+2 → After 2 wears  
+3 → After 3 wears  
+4 → After 4 wears  
+5 → After 5 wears  
+
+Save as:
+user.dirty_threshold
+
+---
+
+4. ADD PROFILE SCREEN
+
+Create: ProfileScreen.tsx
+
+Access:
+- Top-left icon on Home screen
+
+---
+
+PROFILE SCREEN CONTENT:
+
+Section: “Laundry Settings”
+
+- Label:
+“Laundry Sensitivity”
+
+- Show current value:
+e.g. “After 3 wears”
+
+- Option to change:
+→ Use selector (1–5)
+
+- Save updates to Firestore
+
+---
+
+5. UPDATE STATE USAGE
+
+Ensure:
+- dirty_threshold is fetched from user profile
+- used in wear tracking logic
+
+---
+
+6. UI CLEANUP
+
+Closet screen:
+
+Tabs:
+- Closet
+- Laundry
+
+Closet:
+- Show all clean items
+
+Laundry:
+- Show only dirty items
+- Each item:
+  - “Mark as Washed” button
+
+---
+
+7. EDGE CASES
+
+If no dirty items:
+→ Show:
+“No items in laundry”
+
+If no clean items:
+→ Show:
+“All items are in laundry”
+
+---
+
+8. CODE STRUCTURE
+
+Update:
+
+/screens/ClosetScreen.tsx
+/screens/ProfileScreen.tsx
+/services/userService.ts
+
+---
+
+9. CONSTRAINTS
+
+- DO NOT reintroduce style preference
+- DO NOT add new complex features
+- Keep UI minimal and clean
+- Maintain existing functionality
+
+---
+
+OUTPUT:
+
+1. Updated files
+2. Removed components
+3. New Profile screen
+4. Onboarding update
+5. Testing steps
+
+---
+
+Start refining now.

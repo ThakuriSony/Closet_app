@@ -12,29 +12,22 @@ import {
   DIRTY_THRESHOLD_DEFAULT,
   DIRTY_THRESHOLD_MAX,
   DIRTY_THRESHOLD_MIN,
-  type StylePreference,
 } from "@/types";
 
 const PROFILE_KEY = "wearwise:profile:v1";
 
 interface Profile {
   name: string | null;
-  stylePreference: StylePreference | null;
   dirtyThreshold: number | null;
-  preferencesCompleted: boolean;
 }
 
 interface ProfileContextValue {
   name: string | null;
-  stylePreference: StylePreference | null;
   dirtyThreshold: number;
-  preferencesCompleted: boolean;
+  hasDirtyThreshold: boolean;
   loading: boolean;
   setName: (next: string | null) => Promise<void>;
-  setPreferences: (input: {
-    stylePreference: StylePreference;
-    dirtyThreshold: number;
-  }) => Promise<void>;
+  setDirtyThreshold: (n: number) => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -47,9 +40,7 @@ function clampThreshold(n: number): number {
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile>({
     name: null,
-    stylePreference: null,
     dirtyThreshold: null,
-    preferencesCompleted: false,
   });
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -58,15 +49,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       try {
         const raw = await AsyncStorage.getItem(PROFILE_KEY);
         if (raw) {
-          const parsed = JSON.parse(raw) as Partial<Profile>;
+          const parsed = JSON.parse(raw) as Partial<Profile> & {
+            stylePreference?: unknown;
+            preferencesCompleted?: unknown;
+          };
           setProfile({
             name: parsed.name ?? null,
-            stylePreference: parsed.stylePreference ?? null,
             dirtyThreshold:
               typeof parsed.dirtyThreshold === "number"
                 ? clampThreshold(parsed.dirtyThreshold)
                 : null,
-            preferencesCompleted: Boolean(parsed.preferencesCompleted),
           });
         }
       } catch {
@@ -91,14 +83,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     [profile, persist],
   );
 
-  const setPreferences = useCallback<ProfileContextValue["setPreferences"]>(
-    async (input) => {
-      await persist({
-        ...profile,
-        stylePreference: input.stylePreference,
-        dirtyThreshold: clampThreshold(input.dirtyThreshold),
-        preferencesCompleted: true,
-      });
+  const setDirtyThreshold = useCallback<
+    ProfileContextValue["setDirtyThreshold"]
+  >(
+    async (n) => {
+      await persist({ ...profile, dirtyThreshold: clampThreshold(n) });
     },
     [profile, persist],
   );
@@ -106,14 +95,13 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<ProfileContextValue>(
     () => ({
       name: profile.name,
-      stylePreference: profile.stylePreference,
       dirtyThreshold: profile.dirtyThreshold ?? DIRTY_THRESHOLD_DEFAULT,
-      preferencesCompleted: profile.preferencesCompleted,
+      hasDirtyThreshold: profile.dirtyThreshold !== null,
       loading,
       setName,
-      setPreferences,
+      setDirtyThreshold,
     }),
-    [profile, loading, setName, setPreferences],
+    [profile, loading, setName, setDirtyThreshold],
   );
 
   return (
