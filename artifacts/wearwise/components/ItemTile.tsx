@@ -11,7 +11,10 @@ interface ItemTileProps {
   onPress?: () => void;
   onToggleFavorite?: () => void;
   selected?: boolean;
-  width: number;
+  /** Optional fixed width. When omitted the tile fills its parent. */
+  width?: number;
+  /** Optional aspect ratio (width / height). Defaults to 1. */
+  aspectRatio?: number;
 }
 
 export function ItemTile({
@@ -20,6 +23,7 @@ export function ItemTile({
   onToggleFavorite,
   selected,
   width,
+  aspectRatio = 1,
 }: ItemTileProps) {
   const colors = useColors();
   const isDirty = item.status === "dirty";
@@ -31,13 +35,18 @@ export function ItemTile({
         {
           width,
           backgroundColor: colors.card,
-          borderColor: selected ? colors.primary : colors.border,
-          borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
+          borderColor: selected ? colors.foreground : "transparent",
+          borderWidth: selected ? 2 : 0,
           opacity: pressed ? 0.85 : isDirty ? 0.65 : 1,
         },
       ]}
     >
-      <View style={[styles.imageWrap, { backgroundColor: colors.secondary }]}>
+      <View
+        style={[
+          styles.imageWrap,
+          { backgroundColor: colors.secondary, aspectRatio },
+        ]}
+      >
         <Image
           source={{ uri: item.imageUri }}
           style={styles.image}
@@ -62,8 +71,8 @@ export function ItemTile({
               styles.favBtn,
               {
                 backgroundColor: item.isFavorite
-                  ? colors.primary
-                  : "rgba(0,0,0,0.45)",
+                  ? colors.foreground
+                  : "rgba(255,255,255,0.85)",
                 opacity: pressed ? 0.75 : 1,
               },
             ]}
@@ -71,7 +80,7 @@ export function ItemTile({
             <Feather
               name="heart"
               size={14}
-              color={item.isFavorite ? colors.primaryForeground : "#fff"}
+              color={item.isFavorite ? colors.background : colors.foreground}
             />
           </Pressable>
         ) : null}
@@ -96,13 +105,14 @@ export function ItemTile({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 14,
+    borderRadius: 15,
     overflow: "hidden",
   },
   imageWrap: {
-    aspectRatio: 1,
     width: "100%",
     position: "relative",
+    borderRadius: 15,
+    overflow: "hidden",
   },
   image: {
     width: "100%",
@@ -133,8 +143,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   meta: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 4,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   category: {
     fontSize: 13,

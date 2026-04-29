@@ -7,6 +7,7 @@ import {
   FlatList,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -19,9 +20,36 @@ import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
 import { CATEGORIES, type Category, type ClothingItem } from "@/types";
 
-const COLUMN_COUNT = 2;
 const GAP = 14;
 const H_PADDING = 20;
+
+// A small set of pleasing aspect ratios we deterministically pick from per
+// item so the masonry feels varied without ever shuffling between renders.
+const ASPECT_RATIOS = [3 / 4, 4 / 5, 1, 5 / 6, 4 / 5, 3 / 4];
+
+function aspectRatioFor(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return ASPECT_RATIOS[hash % ASPECT_RATIOS.length];
+}
+
+function distributeMasonry<T extends { id: string }>(
+  items: T[],
+): { item: T; aspectRatio: number }[][] {
+  const columns: { item: T; aspectRatio: number }[][] = [[], []];
+  // Track normalized height per column (1/aspectRatio = relative height when
+  // the column width is 1). Greedy place each item into the shorter column.
+  const heights = [0, 0];
+  for (const item of items) {
+    const ratio = aspectRatioFor(item.id);
+    const target = heights[0] <= heights[1] ? 0 : 1;
+    columns[target].push({ item, aspectRatio: ratio });
+    heights[target] += 1 / ratio;
+  }
+  return columns;
+}
 
 type Filter = "All" | "Favorites" | Category;
 type ViewMode = "Closet" | "Laundry";
@@ -54,12 +82,7 @@ export default function ClosetScreen() {
     return cleanItems.filter((i) => i.category === filter);
   }, [cleanItems, filter]);
 
-  const [containerWidth, setContainerWidth] = useState<number>(0);
-  const tileWidth =
-    containerWidth > 0
-      ? (containerWidth - H_PADDING * 2 - GAP * (COLUMN_COUNT - 1)) /
-        COLUMN_COUNT
-      : 0;
+  const masonryColumns = useMemo(() => distributeMasonry(filtered), [filtered]);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const tabBarOffset = Platform.OS === "web" ? 100 : 110;
@@ -74,7 +97,6 @@ export default function ClosetScreen() {
   return (
     <View
       style={[styles.container, { backgroundColor: colors.background }]}
-      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
     >
       <View
         style={[
@@ -138,49 +160,55 @@ export default function ClosetScreen() {
                 description="Mark items as washed in the Laundry tab to bring them back here."
               />
             </View>
+          ) : filtered.length === 0 ? (
+            <View style={{ paddingTop: 60 }}>
+              <EmptyState
+                icon={filter === "Favorites" ? "heart" : "filter"}
+                title={
+                  filter === "Favorites"
+                    ? "No favorites yet"
+                    : `No ${filter.toLowerCase()} items`
+                }
+                description={
+                  filter === "Favorites"
+                    ? "Tap the heart on any item to save it here."
+                    : "Try a different filter or add a new item."
+                }
+              />
+            </View>
           ) : (
-            <FlatList
-              data={filtered}
-              keyExtractor={(i) => i.id}
-              numColumns={COLUMN_COUNT}
-              columnWrapperStyle={{ gap: GAP }}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
               contentContainerStyle={{
                 paddingHorizontal: H_PADDING,
                 paddingTop: 4,
                 paddingBottom: insets.bottom + tabBarOffset,
-                gap: GAP,
               }}
-              renderItem={({ item }) => (
-                <ItemTile
-                  item={item}
-                  width={tileWidth}
-                  onPress={() => router.push(`/item/${item.id}`)}
-                  onToggleFavorite={() => {
-                    if (Platform.OS !== "web") {
-                      Haptics.selectionAsync();
-                    }
-                    void toggleItemFavorite(item.id);
-                  }}
-                />
-              )}
-              ListEmptyComponent={
-                <View style={{ paddingTop: 60 }}>
-                  <EmptyState
-                    icon={filter === "Favorites" ? "heart" : "filter"}
-                    title={
-                      filter === "Favorites"
-                        ? "No favorites yet"
-                        : `No ${filter.toLowerCase()} items`
-                    }
-                    description={
-                      filter === "Favorites"
-                        ? "Tap the heart on any item to save it here."
-                        : "Try a different filter or add a new item."
-                    }
-                  />
-                </View>
-              }
-            />
+            >
+              <View style={styles.masonryRow}>
+                {masonryColumns.map((column, columnIndex) => (
+                  <View
+                    key={columnIndex}
+                    style={[styles.masonryColumn, { gap: GAP }]}
+                  >
+                    {column.map(({ item, aspectRatio }) => (
+                      <ItemTile
+                        key={item.id}
+                        item={item}
+                        aspectRatio={aspectRatio}
+                        onPress={() => router.push(`/item/${item.id}`)}
+                        onToggleFavorite={() => {
+                          if (Platform.OS !== "web") {
+                            Haptics.selectionAsync();
+                          }
+                          void toggleItemFavorite(item.id);
+                        }}
+                      />
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
           )}
         </>
       ) : (
@@ -450,6 +478,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   emptyWrap: {
+    flex: 1,
+  },
+  masonryRow: {
+    flexDirection: "row",
+    gap: GAP,
+  },
+  masonryColumn: {
     flex: 1,
   },
   laundryRow: {

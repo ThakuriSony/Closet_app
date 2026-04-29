@@ -1,37 +1,25 @@
-import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import type { GeneratedOutfit } from "@/services/outfitEngine";
-import type { Category, ClothingItem } from "@/types";
+import type { ClothingItem } from "@/types";
 
 interface Props {
   outfit: GeneratedOutfit | null;
 }
 
-const ORDER: { key: keyof GeneratedOutfit; label: Category }[] = [
-  { key: "top", label: "Top" },
-  { key: "bottom", label: "Bottom" },
-  { key: "shoes", label: "Shoes" },
-  { key: "outerwear", label: "Outerwear" },
-];
-
 export function OutfitPreview({ outfit }: Props) {
   const colors = useColors();
+  const [width, setWidth] = useState(0);
 
   if (!outfit) {
     return (
       <View
-        style={[
-          styles.empty,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
+        style={[styles.empty, { backgroundColor: colors.secondary }]}
       >
-        <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-          <Feather name="sparkles" size={20} color={colors.primary} />
-        </View>
+        <View style={styles.emptyDot} />
         <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
           Ready to dress?
         </Text>
@@ -42,96 +30,124 @@ export function OutfitPreview({ outfit }: Props) {
     );
   }
 
-  const slots = ORDER.filter(({ key }) => outfit[key as keyof GeneratedOutfit]);
+  const top = outfit.top as ClothingItem | undefined;
+  const bottom = outfit.bottom as ClothingItem | undefined;
+  const shoes = outfit.shoes as ClothingItem | undefined;
+  const outerwear = outfit.outerwear as ClothingItem | undefined;
+
+  // Lookbook canvas height — slightly taller than wide for a flat-lay feel.
+  const canvasHeight = width > 0 ? Math.round(width * 1.18) : 0;
+
+  // Sizes are proportional to the card's width so it scales on any device.
+  const topSize = width * 0.5;
+  const bottomSize = width * 0.46;
+  const shoesSize = width * 0.4;
+  const outerSize = width * 0.3;
 
   return (
-    <View style={styles.grid}>
-      {slots.map(({ key, label }) => {
-        const item = outfit[key as keyof GeneratedOutfit] as
-          | ClothingItem
-          | undefined;
-        if (!item) return null;
-        return (
-          <View
-            key={key}
-            style={[
-              styles.slot,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <View
-              style={[
-                styles.imageWrap,
-                { backgroundColor: colors.secondary },
-              ]}
-            >
-              <Image
-                source={{ uri: item.imageUri }}
-                style={styles.image}
-                contentFit="cover"
-              />
-            </View>
-            <Text style={[styles.slotLabel, { color: colors.mutedForeground }]}>
-              {label}
-            </Text>
-            <Text
-              style={[styles.itemColor, { color: colors.foreground }]}
-              numberOfLines={1}
-            >
-              {item.color}
-            </Text>
-          </View>
-        );
-      })}
+    <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      style={[styles.card, { backgroundColor: colors.secondary }]}
+    >
+      {width > 0 ? (
+        <View style={{ height: canvasHeight, width: "100%" }}>
+          {top ? (
+            <LookbookPiece
+              uri={top.imageUri}
+              size={topSize}
+              top={canvasHeight * 0.04}
+              left={(width - topSize) / 2}
+            />
+          ) : null}
+
+          {outerwear ? (
+            <LookbookPiece
+              uri={outerwear.imageUri}
+              size={outerSize}
+              top={canvasHeight * 0.06}
+              left={width * 0.06}
+            />
+          ) : null}
+
+          {bottom ? (
+            <LookbookPiece
+              uri={bottom.imageUri}
+              size={bottomSize}
+              top={canvasHeight * 0.36}
+              left={(width - bottomSize) / 2}
+            />
+          ) : null}
+
+          {shoes ? (
+            <LookbookPiece
+              uri={shoes.imageUri}
+              size={shoesSize}
+              top={canvasHeight * 0.66}
+              left={(width - shoesSize) / 2}
+            />
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function LookbookPiece({
+  uri,
+  size,
+  top,
+  left,
+}: {
+  uri: string;
+  size: number;
+  top: number;
+  left: number;
+}) {
+  return (
+    <View
+      style={[
+        styles.piece,
+        {
+          width: size,
+          height: size,
+          top,
+          left,
+        },
+      ]}
+    >
+      <Image
+        source={{ uri }}
+        style={{ width: "100%", height: "100%" }}
+        contentFit="contain"
+        transition={150}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  slot: {
-    width: "47%",
-    flexGrow: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 14,
-    padding: 10,
-  },
-  imageWrap: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 10,
+  card: {
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
     overflow: "hidden",
-    marginBottom: 8,
   },
-  image: { width: "100%", height: "100%" },
-  slotLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  itemColor: {
-    marginTop: 2,
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
+  piece: {
+    position: "absolute",
   },
   empty: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 20,
+    paddingVertical: 48,
+    paddingHorizontal: 24,
     alignItems: "center",
     gap: 10,
   },
-  emptyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
+  emptyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#111111",
+    marginBottom: 6,
   },
   emptyTitle: {
     fontSize: 16,
@@ -143,3 +159,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+

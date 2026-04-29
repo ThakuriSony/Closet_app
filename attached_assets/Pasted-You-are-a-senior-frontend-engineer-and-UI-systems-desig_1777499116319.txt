@@ -1,0 +1,154 @@
+You are a senior frontend engineer and UI systems designer.
+
+We are redesigning the UI of an existing React Native (Expo) app called “Wearwise”.
+
+IMPORTANT:
+This is a VISUAL + LAYOUT REFINEMENT.
+Do NOT change core logic.
+Do NOT break functionality.
+
+---
+
+GOAL:
+
+Create a clean, minimal UI inspired by Apple design and modern AI apps.
+
+---
+
+1. DESIGN SYSTEM
+
+Apply globally:
+
+Colors:
+- Background: #FFFFFF
+- Secondary background: #F7F7F5
+- Accent (buttons): #DED957
+
+Text:
+- Primary: #111111
+- Secondary: #6B6B6B
+
+---
+
+2. BUTTONS
+
+- Background: #DED957
+- Border radius: 15
+- Text color: black
+- No shadows
+- Clean, soft look
+
+---
+
+3. ICONS
+
+- Use minimal line icons only
+- Keep size small
+- Avoid clutter
+
+---
+
+4. HOME SCREEN — OUTFIT LOOKBOOK (CRITICAL)
+
+Replace current outfit display:
+
+REMOVE:
+- Multiple large stacked images
+
+CREATE:
+- Single “lookbook card”
+
+Inside card:
+
+- Soft grey background (#F7F7F5)
+- Position clothing images manually:
+
+  Top:
+    - Upper area
+
+  Bottom:
+    - Center
+
+  Shoes:
+    - Bottom
+
+- Use absolute positioning inside container
+- Maintain clean spacing
+- Avoid overlap clutter
+
+- Result should feel like:
+  Pinterest flat-lay outfit
+
+---
+
+5. CLOSET SCREEN — PINTEREST STYLE GRID
+
+Replace current grid layout with:
+
+- Masonry / staggered layout
+- 2 columns
+- Variable image heights
+
+Requirements:
+
+- Maintain aspect ratio
+- No stretching
+- Add spacing between items
+- Smooth scrolling
+
+---
+
+6. GENERAL LAYOUT
+
+- Increase whitespace
+- Use padding: 16–20
+- Avoid heavy borders
+- Use soft sections instead of hard lines
+
+---
+
+7. TAB NAVIGATION
+
+- Minimal icons only
+- No labels clutter (or keep subtle)
+- Keep spacing clean
+
+---
+
+8. PERFORMANCE
+
+- Ensure masonry layout is efficient
+- Avoid layout jumps
+- Optimize image loading
+
+---
+
+9. FILES TO UPDATE
+
+- HomeScreen.tsx
+- ClosetScreen.tsx
+- Reusable OutfitPreview component
+- Global styles / theme file
+
+---
+
+OUTPUT:
+
+1. Updated UI components
+2. Masonry layout implementation
+3. Lookbook outfit layout
+4. Global style system
+5. Testing steps
+
+---
+
+CONSTRAINTS:
+
+- DO NOT add heavy animations
+- DO NOT use bright colors
+- DO NOT clutter UI
+- Keep everything minimal and premium
+
+---
+
+Start redesigning now.
