@@ -1,0 +1,147 @@
+You are a senior React Native engineer and UI systems designer.
+
+We are improving the outfit display in the Wearwise app.
+
+IMPORTANT:
+This phase includes:
+1. New layout (left/right composition)
+2. Background removal for clothing images
+
+Do NOT break existing functionality.
+
+---
+
+GOAL:
+
+Create a clean editorial layout where:
+
+- Top + Bottom are on LEFT
+- Shoes + Accessories are on RIGHT
+- Images have NO background (transparent)
+
+---
+
+1. REMOVE CURRENT LAYOUT
+
+- Remove stacked or centered layout
+- Do NOT overlap items randomly
+
+---
+
+2. CREATE TWO-COLUMN LAYOUT
+
+Parent container:
+- Background: #F7F7F5
+- Border radius: 20
+- Padding: 20
+
+Inside:
+
+LEFT COLUMN:
+- Top (large)
+- Bottom (below top)
+
+RIGHT COLUMN:
+- Shoes
+- Accessories
+
+---
+
+3. SIZE PROPORTION RULES
+
+- Top: largest
+- Bottom: slightly smaller
+- Shoes: medium
+- Accessories: small
+
+Ensure:
+- Balanced visual weight between columns
+
+---
+
+4. SPACING
+
+- Equal vertical spacing between items
+- Space between columns
+- Center align vertically overall
+
+---
+
+5. IMAGE HANDLING
+
+- Use contain mode
+- Maintain aspect ratio
+- Do NOT stretch
+
+---
+
+6. BACKGROUND REMOVAL (CRITICAL)
+
+Implement background removal pipeline:
+
+Step 1:
+User uploads image
+
+Step 2:
+Send image to background removal API (e.g. remove.bg)
+
+Step 3:
+Receive processed image (transparent PNG)
+
+Step 4:
+Store processed image in Firebase Storage
+
+Step 5:
+Use processed image in UI
+
+---
+
+7. FALLBACK
+
+If background removal fails:
+→ use original image
+
+---
+
+8. PERFORMANCE
+
+- Cache processed images
+- Do NOT reprocess same image multiple times
+
+---
+
+9. OPTIONAL POLISH
+
+- Add very subtle shadow to items
+- Keep minimal
+
+---
+
+10. FILES TO UPDATE
+
+- HomeScreen.tsx
+- OutfitPreview component
+- Image upload pipeline
+- New service: backgroundRemoval.ts
+
+---
+
+OUTPUT:
+
+1. Updated layout implementation
+2. Background removal integration
+3. Image pipeline update
+4. Testing steps
+
+---
+
+CONSTRAINTS:
+
+- DO NOT use square image containers
+- DO NOT keep image backgrounds
+- DO NOT clutter layout
+- Keep design minimal and balanced
+
+---
+
+Start implementing now.

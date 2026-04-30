@@ -19,6 +19,7 @@ export interface GeneratedOutfit {
   bottom?: ClothingItem;
   shoes?: ClothingItem;
   outerwear?: ClothingItem;
+  accessory?: ClothingItem;
   missing: Category[];
 }
 
@@ -248,6 +249,16 @@ export function generateOutfit(
     );
   }
 
+  // Accessories are optional — only included when the user actually has some.
+  // Doesn't add to the "missing" list, since most outfits don't need one.
+  const accessory = pickBestFor(
+    items,
+    "Accessories",
+    effectiveOccasion,
+    bodyBucket,
+    freq,
+  );
+
   const missing: Category[] = [];
   if (!top.item) missing.push("Top");
   if (!bottom.item) missing.push("Bottom");
@@ -258,13 +269,15 @@ export function generateOutfit(
     top.usedDirty ||
     bottom.usedDirty ||
     shoes.usedDirty ||
-    outerwear.usedDirty;
+    outerwear.usedDirty ||
+    accessory.usedDirty;
 
   return {
     top: top.item,
     bottom: bottom.item,
     shoes: shoes.item,
     outerwear: outerwear.item,
+    accessory: accessory.item,
     missing,
     usedDirty,
   };

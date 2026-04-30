@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import React, { useState } from "react";
+import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
@@ -10,9 +10,16 @@ interface Props {
   outfit: GeneratedOutfit | null;
 }
 
+// The image source we render: prefer the background-removed PNG when available
+// so the lookbook layout sits cleanly on the card background.
+function displayUri(item: ClothingItem): string {
+  return item.processedImageUri && item.processedImageUri.length > 0
+    ? item.processedImageUri
+    : item.imageUri;
+}
+
 export function OutfitPreview({ outfit }: Props) {
   const colors = useColors();
-  const [width, setWidth] = useState(0);
 
   if (!outfit) {
     return (
@@ -34,87 +41,61 @@ export function OutfitPreview({ outfit }: Props) {
   const bottom = outfit.bottom as ClothingItem | undefined;
   const shoes = outfit.shoes as ClothingItem | undefined;
   const outerwear = outfit.outerwear as ClothingItem | undefined;
+  const accessory = outfit.accessory as ClothingItem | undefined;
 
-  // Lookbook canvas height — slightly taller than wide for a flat-lay feel.
-  const canvasHeight = width > 0 ? Math.round(width * 1.18) : 0;
-
-  // Sizes are proportional to the card's width so it scales on any device.
-  const topSize = width * 0.5;
-  const bottomSize = width * 0.46;
-  const shoesSize = width * 0.4;
-  const outerSize = width * 0.3;
+  // Right column hosts shoes + accessories. If there's no accessory, fall back
+  // to outerwear so the right column doesn't feel empty.
+  const rightSecondary = accessory ?? outerwear;
 
   return (
     <View
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-      style={[styles.card, { backgroundColor: colors.secondary }]}
+      style={[
+        styles.card,
+        { backgroundColor: colors.secondary, borderColor: colors.border },
+      ]}
     >
-      {width > 0 ? (
-        <View style={{ height: canvasHeight, width: "100%" }}>
+      <View style={styles.row}>
+        <View style={styles.column}>
           {top ? (
-            <LookbookPiece
-              uri={top.imageUri}
-              size={topSize}
-              top={canvasHeight * 0.04}
-              left={(width - topSize) / 2}
-            />
-          ) : null}
-
-          {outerwear ? (
-            <LookbookPiece
-              uri={outerwear.imageUri}
-              size={outerSize}
-              top={canvasHeight * 0.06}
-              left={width * 0.06}
-            />
-          ) : null}
-
+            <Piece uri={displayUri(top)} size="large" />
+          ) : (
+            <Placeholder size="large" label="Top" />
+          )}
           {bottom ? (
-            <LookbookPiece
-              uri={bottom.imageUri}
-              size={bottomSize}
-              top={canvasHeight * 0.36}
-              left={(width - bottomSize) / 2}
-            />
-          ) : null}
-
-          {shoes ? (
-            <LookbookPiece
-              uri={shoes.imageUri}
-              size={shoesSize}
-              top={canvasHeight * 0.66}
-              left={(width - shoesSize) / 2}
-            />
-          ) : null}
+            <Piece uri={displayUri(bottom)} size="medium" />
+          ) : (
+            <Placeholder size="medium" label="Bottom" />
+          )}
         </View>
-      ) : null}
+
+        <View style={styles.column}>
+          {shoes ? (
+            <Piece uri={displayUri(shoes)} size="medium" />
+          ) : (
+            <Placeholder size="medium" label="Shoes" />
+          )}
+          {rightSecondary ? (
+            <Piece uri={displayUri(rightSecondary)} size="small" />
+          ) : (
+            <Placeholder size="small" label="Accessory" />
+          )}
+        </View>
+      </View>
     </View>
   );
 }
 
-function LookbookPiece({
-  uri,
-  size,
-  top,
-  left,
-}: {
-  uri: string;
-  size: number;
-  top: number;
-  left: number;
-}) {
+type Size = "large" | "medium" | "small";
+
+const HEIGHTS: Record<Size, number> = {
+  large: 170,
+  medium: 130,
+  small: 90,
+};
+
+function Piece({ uri, size }: { uri: string; size: Size }) {
   return (
-    <View
-      style={[
-        styles.piece,
-        {
-          width: size,
-          height: size,
-          top,
-          left,
-        },
-      ]}
-    >
+    <View style={[styles.piece, { height: HEIGHTS[size] }]}>
       <Image
         source={{ uri }}
         style={{ width: "100%", height: "100%" }}
@@ -125,15 +106,67 @@ function LookbookPiece({
   );
 }
 
+function Placeholder({ size, label }: { size: Size; label: string }) {
+  const colors = useColors();
+  return (
+    <View
+      style={[
+        styles.placeholder,
+        {
+          height: HEIGHTS[size],
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      <Text
+        style={[styles.placeholderText, { color: colors.mutedForeground }]}
+      >
+        No {label.toLowerCase()}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    padding: 20,
     overflow: "hidden",
   },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  column: {
+    flex: 1,
+    gap: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   piece: {
-    position: "absolute",
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    // Subtle, minimal shadow — keeps items readable on the card without
+    // looking heavy.
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  placeholder: {
+    width: "100%",
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  placeholderText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
   },
   empty: {
     borderRadius: 20,
@@ -159,4 +192,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-
