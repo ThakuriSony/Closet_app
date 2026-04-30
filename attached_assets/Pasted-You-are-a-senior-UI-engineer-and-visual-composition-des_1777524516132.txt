@@ -1,0 +1,161 @@
+You are a senior UI engineer and visual composition designer.
+
+We are building an outfit composition engine in a React Native (Expo) app called “Wearwise”.
+
+IMPORTANT:
+The goal is to generate Pinterest-style outfit layouts (editorial flat-lay style), NOT grids or stacked layouts.
+
+---
+
+GOAL:
+
+Automatically arrange clothing items into a visually appealing, asymmetrical, editorial composition.
+
+---
+
+INPUT:
+
+You will receive clothing items grouped as:
+
+- top
+- bottom
+- shoes
+- outerwear (optional)
+- accessories (0–3 items)
+
+Each item has:
+- image (preferably transparent PNG)
+- category
+
+---
+
+CRITICAL DESIGN RULES (MUST FOLLOW)
+
+1. NO GRID LAYOUT
+- Do NOT align items in rows or columns
+- Do NOT center everything symmetrically
+
+2. USE VISUAL HIERARCHY
+- One item must act as “anchor” (largest)
+  → usually bottom OR top
+- Secondary item slightly smaller
+- Shoes + accessories smaller
+
+3. ASYMMETRICAL COMPOSITION
+- Left and right sides must NOT mirror each other
+- Layout should feel naturally balanced, not evenly distributed
+
+4. NEGATIVE SPACE
+- Leave intentional empty space (at least 20–30%)
+- Do NOT fill entire container
+
+---
+
+LAYOUT STRATEGY (DEFAULT)
+
+Use this structure:
+
+- LEFT SIDE (dominant):
+  - Top (medium-large)
+  - Bottom (largest, anchor)
+
+- RIGHT SIDE (supporting):
+  - Shoes (medium)
+  - Accessories (small, grouped)
+
+- Outerwear:
+  - Place near top, slightly offset (left or right)
+
+---
+
+SIZE RULES
+
+- Bottom: 1.1 scale (largest)
+- Top: 1.0 scale
+- Shoes: 0.7–0.8 scale
+- Accessories: 0.5–0.6 scale
+- Outerwear: 0.7 scale
+
+---
+
+POSITIONING RULES
+
+- Do NOT stack vertically
+- Slightly offset items horizontally
+- Maintain visual balance (not symmetry)
+- Avoid overlap unless subtle and intentional
+
+---
+
+GROUPING RULE
+
+- Accessories should be grouped together as a cluster
+- Do NOT scatter them randomly
+
+---
+
+IMAGE RULES
+
+- Maintain aspect ratio
+- Use “contain” mode
+- Prefer transparent backgrounds
+- If background exists:
+  → apply soft shadow and spacing to reduce harsh edges
+
+---
+
+CONTAINER
+
+- Background: #F7F7F5 (soft grey)
+- Border radius: 20
+- Padding: 20–24
+
+---
+
+FALLBACK RULES
+
+If some items are missing:
+
+- No accessories → expand spacing
+- No outerwear → rebalance layout
+- Only 2 items → center but keep asymmetry
+
+---
+
+OUTPUT FORMAT
+
+Return layout as:
+
+[
+  {
+    itemId,
+    position: { x, y },
+    size: { width, height },
+    zIndex
+  }
+]
+
+Coordinates should be relative to container.
+
+---
+
+ANTI-PATTERNS (DO NOT DO)
+
+- ❌ Equal spacing between all items
+- ❌ Same size for all items
+- ❌ Perfect center alignment
+- ❌ Grid or list layouts
+- ❌ Items stacked directly on top of each other
+
+---
+
+DESIGN GOAL
+
+The result should feel like:
+- Pinterest outfit board
+- Fashion editorial flat lay
+- Clean, minimal, premium
+
+---
+
+Start generating layout logic now.
