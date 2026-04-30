@@ -44,6 +44,12 @@ router.post("/images/remove-bg", async (req, res) => {
   const form = new FormData();
   form.append("size", "auto");
   form.append("format", "png");
+  // `crop=true` trims away empty borders so the returned PNG is tight to the
+  // subject. This is what gives the lookbook layout consistent visual weight
+  // per category — without it, items photographed with lots of empty space
+  // would render small inside their bounding box.
+  form.append("crop", "true");
+  form.append("crop_margin", "5%");
   // Convert the Node Buffer to a Blob the global FormData understands.
   const blob = new Blob([new Uint8Array(bytes)], { type: mimeType });
   form.append("image_file", blob, "upload.jpg");

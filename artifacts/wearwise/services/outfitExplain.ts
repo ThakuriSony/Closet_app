@@ -47,6 +47,14 @@ export async function explainOutfit(
       color: outfit.outerwear.color,
       tags: outfit.outerwear.tags,
     });
+  for (const a of outfit.accessories ?? []) {
+    items.push({
+      slot: "Accessory",
+      category: a.category,
+      color: a.color,
+      tags: a.tags,
+    });
+  }
 
   const payload: ExplainPayload = {
     occasion,

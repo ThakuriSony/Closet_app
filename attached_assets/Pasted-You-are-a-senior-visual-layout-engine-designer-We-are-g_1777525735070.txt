@@ -1,0 +1,135 @@
+You are a senior visual layout engine designer.
+
+We are generating Pinterest-style outfit compositions.
+
+IMPORTANT:
+Previous attempts failed because items were placed without normalization and visual weight control.
+
+You MUST follow a structured composition system.
+
+---
+
+GOAL:
+
+Create a clean, editorial outfit layout that looks like a fashion flat-lay from Pinterest.
+
+---
+
+STEP 1 — NORMALIZE ALL IMAGES (CRITICAL)
+
+Before layout:
+
+For each item:
+- Trim excess transparent/white padding
+- Center the clothing item
+- Fit into a consistent bounding box
+
+Use category-based boxes:
+
+- Top: square (1:1)
+- Bottom: vertical (3:4)
+- Shoes: horizontal (4:3)
+- Accessories: small square
+
+---
+
+STEP 2 — DEFINE LAYOUT STRUCTURE
+
+Use a 2-column asymmetrical layout:
+
+LEFT (dominant):
+- Bottom (anchor, largest)
+- Top (above it)
+
+RIGHT (supporting):
+- Shoes
+- Accessories (grouped)
+
+Outerwear:
+- Optional, near top, slightly offset
+
+---
+
+STEP 3 — ANCHOR SYSTEM
+
+- Bottom item is the anchor
+- All other items positioned relative to bottom
+
+---
+
+STEP 4 — VISUAL WEIGHT CONTROL
+
+Adjust size dynamically:
+
+- If item is visually heavy → reduce scale
+- If item is small → slightly increase
+
+Goal:
+Balanced composition, not equal sizes
+
+---
+
+STEP 5 — ALIGNMENT RULES
+
+- Maintain vertical alignment spine
+- Keep consistent spacing between items
+- Avoid floating randomness
+
+---
+
+STEP 6 — GROUP ACCESSORIES
+
+- Place accessories as a cluster
+- Keep them close together
+- Treat as one visual unit
+
+---
+
+STEP 7 — NEGATIVE SPACE
+
+- Leave 25–35% empty space
+- Do NOT fill container
+
+---
+
+STEP 8 — FINAL POLISH
+
+- Add subtle shadow under items
+- Ensure no overlapping chaos
+- Maintain clean spacing
+
+---
+
+OUTPUT:
+
+Return structured layout with:
+
+- position
+- size
+- alignment references
+
+---
+
+ANTI-PATTERNS:
+
+- ❌ raw placement without normalization
+- ❌ equal spacing
+- ❌ equal sizes
+- ❌ random floating items
+
+---
+
+DESIGN GOAL:
+
+The result must feel like:
+- curated fashion layout
+- intentional composition
+- clean and premium
+
+NOT like:
+- generated collage
+- stacked UI elements
+
+---
+
+Start now.

@@ -19,7 +19,8 @@ export interface GeneratedOutfit {
   bottom?: ClothingItem;
   shoes?: ClothingItem;
   outerwear?: ClothingItem;
-  accessory?: ClothingItem;
+  // Up to 3 accessories, ranked best-first. Optional — most outfits have none.
+  accessories: ClothingItem[];
   missing: Category[];
 }
 
@@ -249,14 +250,15 @@ export function generateOutfit(
     );
   }
 
-  // Accessories are optional — only included when the user actually has some.
+  // Accessories are optional — included only when the user actually has some.
   // Doesn't add to the "missing" list, since most outfits don't need one.
-  const accessory = pickBestFor(
+  // We pick up to 3 best-scoring accessories so they can render as a cluster.
+  const accessories = pickTopAccessories(
     items,
-    "Accessories",
     effectiveOccasion,
     bodyBucket,
     freq,
+    3,
   );
 
   const missing: Category[] = [];
@@ -270,15 +272,45 @@ export function generateOutfit(
     bottom.usedDirty ||
     shoes.usedDirty ||
     outerwear.usedDirty ||
-    accessory.usedDirty;
+    accessories.some((a) => a.status === "dirty");
 
   return {
     top: top.item,
     bottom: bottom.item,
     shoes: shoes.item,
     outerwear: outerwear.item,
-    accessory: accessory.item,
+    accessories,
     missing,
     usedDirty,
   };
+}
+
+// Score every accessory in the wardrobe for the current occasion + weather
+// and return the top N (preferring clean items, falling back to dirty).
+function pickTopAccessories(
+  items: ClothingItem[],
+  occasion: Occasion,
+  weather: WeatherBucket,
+  freq: Map<string, number>,
+  limit: number,
+): ClothingItem[] {
+  const candidates = items.filter((i) => i.category === "Accessories");
+  if (candidates.length === 0) return [];
+
+  const cleanFirst = [
+    ...candidates.filter((c) => c.status !== "dirty"),
+    ...candidates.filter((c) => c.status === "dirty"),
+  ];
+
+  const scored = cleanFirst
+    .map((item) => ({
+      item,
+      // Non-strict scoring for accessories: most accessories are occasion-
+      // agnostic (a watch works for "Casual" and "Formal" alike) so we don't
+      // want to penalize them for missing the avoid-list signal.
+      score: scoreItem(item, occasion, weather, freq, false),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, limit).map((s) => s.item);
 }

@@ -10,137 +10,209 @@ interface Props {
   outfit: GeneratedOutfit | null;
 }
 
+// ---------------------------------------------------------------------------
+// Composition system (Pinterest / editorial flat-lay)
+// ---------------------------------------------------------------------------
+//
+// The layout is built around a few hard rules:
+//
+//   1. NORMALIZED BOUNDING BOXES PER CATEGORY
+//      Every item lives inside a fixed-aspect box decided by its category:
+//        - Top         → 1 : 1   (square)
+//        - Bottom      → 3 : 4   (vertical)   ← anchor
+//        - Outerwear   → 1 : 1   (square)
+//        - Shoes       → 4 : 3   (horizontal)
+//        - Accessory   → 1 : 1   (small square, clustered)
+//      Combined with `contentFit="contain"` and the server-side `crop=true`
+//      we send to remove.bg, every item ends up visually weighted the same
+//      way regardless of how the source photo was framed.
+//
+//   2. ANCHOR + RELATIVE POSITIONING
+//      The BOTTOM piece is the anchor. Every other slot's position is
+//      derived from the bottom's box. If bottom is missing, the top becomes
+//      the anchor and we recenter from there.
+//
+//   3. TWO ALIGNMENT SPINES (asymmetric, not mirrored)
+//      Left column items share an x-center spine (~0.27 of canvas width).
+//      Right column items share a different spine (~0.78). The spines
+//      themselves are offset, so the layout reads asymmetric overall while
+//      each column still feels deliberate.
+//
+//   4. ACCESSORY CLUSTER
+//      Up to 3 accessories render as a tight grouped unit on the right
+//      column, never scattered.
+//
+//   5. NEGATIVE SPACE
+//      Canvas height = width × 1.18. Items collectively occupy ~70% of
+//      canvas area; the remaining ~30% is intentional whitespace.
+
 type SlotKind = "top" | "bottom" | "shoes" | "outerwear" | "accessory";
 
 interface LayoutBlock {
   key: string;
   kind: SlotKind;
   uri: string;
-  x: number; // px from canvas left
-  y: number; // px from canvas top
+  x: number;
+  y: number;
   w: number;
   h: number;
   z: number;
 }
 
-// Prefer the background-removed PNG when available so items sit cleanly on
-// the container background instead of pulling along their own rectangle.
+// Aspect ratio (width / height) of each category's bounding box.
+const ASPECT: Record<SlotKind, number> = {
+  top: 1, // 1:1
+  bottom: 3 / 4, // 3:4 vertical
+  outerwear: 1, // 1:1
+  shoes: 4 / 3, // 4:3 horizontal
+  accessory: 1, // small square
+};
+
 function displayUri(item: ClothingItem): string {
   return item.processedImageUri && item.processedImageUri.length > 0
     ? item.processedImageUri
     : item.imageUri;
 }
 
-// ---------------------------------------------------------------------------
-// Composition engine
-// ---------------------------------------------------------------------------
-//
-// Builds a Pinterest / editorial flat-lay arrangement from the outfit pieces.
-// Coordinates are relative to a virtual canvas sized to the container width.
-// The result is intentionally asymmetric: the BOTTOM piece is the anchor on
-// the lower-left, the TOP sits above it slightly offset, OUTERWEAR floats in
-// the top-right, SHOES sit mid-right, and the optional ACCESSORY clusters
-// below the shoes. Missing slots trigger small rebalances rather than holes.
-//
-// Each tile renders the source image with `contentFit="contain"`, so wider
-// pieces (shoes, scarves) don't stretch — they just sit inside their box.
-
-interface SlotRect {
-  // Fractions of the canvas width / height. Converted to pixels at render
-  // time so the layout scales to any container size.
-  xf: number;
-  yf: number;
-  wf: number;
-  hf: number;
-  z: number;
-}
-
-// Default 5-piece flat-lay (all slots populated). The numbers are tuned to
-// honor the design rules: bottom is largest (anchor), top is secondary,
-// outerwear floats top-right, shoes sit mid-right, accessory clusters below.
-const FULL_LAYOUT: Record<SlotKind, SlotRect> = {
-  top:       { xf: 0.02, yf: 0.04, wf: 0.46, hf: 0.42, z: 2 },
-  bottom:    { xf: 0.06, yf: 0.40, wf: 0.54, hf: 0.56, z: 3 },
-  outerwear: { xf: 0.58, yf: 0.02, wf: 0.34, hf: 0.40, z: 1 },
-  shoes:     { xf: 0.62, yf: 0.46, wf: 0.34, hf: 0.22, z: 4 },
-  accessory: { xf: 0.66, yf: 0.72, wf: 0.26, hf: 0.22, z: 5 },
-};
-
-// Lookup of fallback layouts when slots are missing. Keys are sorted slot
-// names joined with "+", values are partial layouts that override FULL_LAYOUT.
-function rebalance(present: Set<SlotKind>): Record<SlotKind, SlotRect> {
-  const layout: Record<SlotKind, SlotRect> = {
-    ...FULL_LAYOUT,
-  };
-
-  // No outerwear → let the top breathe into the upper-right.
-  if (!present.has("outerwear")) {
-    layout.top = { xf: 0.04, yf: 0.04, wf: 0.54, hf: 0.46, z: 2 };
-  }
-
-  // No accessory → give the shoes more vertical room and shift them lower
-  // so the right column doesn't feel top-heavy.
-  if (!present.has("accessory")) {
-    layout.shoes = { xf: 0.60, yf: 0.56, wf: 0.36, hf: 0.26, z: 4 };
-  }
-
-  // No shoes → drop accessory into shoes' spot so the right column has
-  // something at eye level.
-  if (!present.has("shoes") && present.has("accessory")) {
-    layout.accessory = { xf: 0.62, yf: 0.50, wf: 0.30, hf: 0.26, z: 5 };
-  }
-
-  // Only TWO pieces total → center them with a deliberate horizontal offset
-  // so it still reads asymmetric.
-  if (present.size === 2 && present.has("top") && present.has("bottom")) {
-    layout.top    = { xf: 0.10, yf: 0.06, wf: 0.50, hf: 0.46, z: 2 };
-    layout.bottom = { xf: 0.30, yf: 0.42, wf: 0.58, hf: 0.56, z: 3 };
-  }
-
-  // Only ONE piece → center it at hero size.
-  if (present.size === 1) {
-    const only = [...present][0]!;
-    layout[only] = { xf: 0.18, yf: 0.10, wf: 0.64, hf: 0.80, z: 1 };
-  }
-
-  return layout;
-}
-
+// Returns the layout blocks for the given canvas size and outfit.
 function compose(
-  width: number,
-  height: number,
+  canvasW: number,
+  canvasH: number,
   outfit: GeneratedOutfit,
 ): LayoutBlock[] {
-  const slots: { kind: SlotKind; item?: ClothingItem }[] = [
-    { kind: "top", item: outfit.top },
-    { kind: "bottom", item: outfit.bottom },
-    { kind: "outerwear", item: outfit.outerwear },
-    { kind: "shoes", item: outfit.shoes },
-    { kind: "accessory", item: outfit.accessory },
-  ];
+  const blocks: LayoutBlock[] = [];
 
-  const present = new Set<SlotKind>(
-    slots.filter((s) => s.item).map((s) => s.kind),
-  );
-  if (present.size === 0) return [];
+  // Spines define the x-center of each column. Slight asymmetry between them
+  // (left at 0.30, right at 0.74) keeps the composition off-center.
+  const spineLeft = canvasW * 0.3;
+  const spineRight = canvasW * 0.74;
 
-  const layout = rebalance(present);
-
-  return slots
-    .filter((s): s is { kind: SlotKind; item: ClothingItem } => !!s.item)
-    .map((s) => {
-      const r = layout[s.kind];
-      return {
-        key: `${s.kind}:${s.item.id}`,
-        kind: s.kind,
-        uri: displayUri(s.item),
-        x: Math.round(r.xf * width),
-        y: Math.round(r.yf * height),
-        w: Math.round(r.wf * width),
-        h: Math.round(r.hf * height),
-        z: r.z,
-      };
+  // Anchor: BOTTOM (3:4). Width is the dominant slot in the layout.
+  const bottomW = canvasW * 0.5;
+  const bottomH = bottomW / ASPECT.bottom; // 3:4 → height = w * 4/3
+  const bottomX = spineLeft - bottomW / 2;
+  // Position the bottom so it sits in the lower portion of the canvas with
+  // a small margin from the bottom edge.
+  const bottomY = canvasH - bottomH - canvasH * 0.04;
+  if (outfit.bottom) {
+    blocks.push({
+      key: `bottom:${outfit.bottom.id}`,
+      kind: "bottom",
+      uri: displayUri(outfit.bottom),
+      x: bottomX,
+      y: bottomY,
+      w: bottomW,
+      h: bottomH,
+      z: 3,
     });
+  }
+
+  // TOP (1:1) sits above the bottom on the same spine, with a small
+  // breathing gap. If there's no bottom, recenter near the top of the canvas.
+  const topW = canvasW * 0.42;
+  const topH = topW / ASPECT.top;
+  const topX = spineLeft - topW / 2;
+  const topY = outfit.bottom
+    ? Math.max(canvasH * 0.03, bottomY - topH - canvasH * 0.025)
+    : canvasH * 0.08;
+  if (outfit.top) {
+    blocks.push({
+      key: `top:${outfit.top.id}`,
+      kind: "top",
+      uri: displayUri(outfit.top),
+      x: topX,
+      y: topY,
+      w: topW,
+      h: topH,
+      z: 2,
+    });
+  }
+
+  // OUTERWEAR (1:1) — small, near the top of the right column, deliberately
+  // offset toward the right edge so it reads as "pinned" rather than
+  // mirroring the top.
+  const outerW = canvasW * 0.3;
+  const outerH = outerW / ASPECT.outerwear;
+  const outerX = canvasW - outerW - canvasW * 0.03;
+  const outerY = canvasH * 0.03;
+  if (outfit.outerwear) {
+    blocks.push({
+      key: `outerwear:${outfit.outerwear.id}`,
+      kind: "outerwear",
+      uri: displayUri(outfit.outerwear),
+      x: outerX,
+      y: outerY,
+      w: outerW,
+      h: outerH,
+      z: 1,
+    });
+  }
+
+  // SHOES (4:3) — middle of the right column, on the right spine. If there's
+  // no outerwear, shoes lift higher to fill the visual gap at the top.
+  const shoesW = canvasW * 0.36;
+  const shoesH = shoesW / ASPECT.shoes;
+  const shoesX = spineRight - shoesW / 2;
+  const shoesY = outfit.outerwear
+    ? outerY + outerH + canvasH * 0.03
+    : canvasH * 0.18;
+  if (outfit.shoes) {
+    blocks.push({
+      key: `shoes:${outfit.shoes.id}`,
+      kind: "shoes",
+      uri: displayUri(outfit.shoes),
+      x: shoesX,
+      y: shoesY,
+      w: shoesW,
+      h: shoesH,
+      z: 4,
+    });
+  }
+
+  // ACCESSORY CLUSTER — up to 3 items, grouped on the right spine below the
+  // shoes. Layout depends on count:
+  //   1 → single tile, centered
+  //   2 → side-by-side
+  //   3 → triangle (two on top, one centered below)
+  const accessories = (outfit.accessories ?? []).slice(0, 3);
+  if (accessories.length > 0) {
+    const tile = canvasW * 0.18; // each accessory tile is ~18% wide
+    const gap = canvasW * 0.02;
+    const clusterTop = outfit.shoes
+      ? shoesY + shoesH + canvasH * 0.03
+      : canvasH * 0.45;
+
+    type Pos = { dx: number; dy: number };
+    const positionsByCount: Record<number, Pos[]> = {
+      1: [{ dx: 0, dy: 0 }],
+      2: [
+        { dx: -(tile / 2 + gap / 2), dy: 0 },
+        { dx: tile / 2 + gap / 2, dy: 0 },
+      ],
+      3: [
+        { dx: -(tile / 2 + gap / 2), dy: 0 },
+        { dx: tile / 2 + gap / 2, dy: 0 },
+        { dx: 0, dy: tile + gap },
+      ],
+    };
+    const positions = positionsByCount[accessories.length] ?? [];
+    accessories.forEach((acc, i) => {
+      const p = positions[i];
+      if (!p) return;
+      blocks.push({
+        key: `accessory:${acc.id}`,
+        kind: "accessory",
+        uri: displayUri(acc),
+        x: spineRight + p.dx - tile / 2,
+        y: clusterTop + p.dy,
+        w: tile,
+        h: tile / ASPECT.accessory,
+        z: 5,
+      });
+    });
+  }
+
+  return blocks;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,9 +239,9 @@ export function OutfitPreview({ outfit }: Props) {
     );
   }
 
-  // The canvas is slightly taller than wide so the asymmetric layout has
-  // room to breathe (≈25% negative space).
-  const canvasHeight = width > 0 ? Math.round(width * 1.15) : 0;
+  // Canvas height ~1.18× width gives the bottom anchor room to breathe and
+  // leaves ~25–30% negative space overall.
+  const canvasHeight = width > 0 ? Math.round(width * 1.18) : 0;
 
   const blocks =
     width > 0 && canvasHeight > 0 ? compose(width, canvasHeight, outfit) : [];
@@ -177,18 +249,10 @@ export function OutfitPreview({ outfit }: Props) {
   return (
     <View
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-      style={[
-        styles.card,
-        { backgroundColor: colors.secondary },
-      ]}
+      style={[styles.card, { backgroundColor: colors.secondary }]}
     >
       {width > 0 ? (
-        <View
-          style={{
-            height: canvasHeight,
-            width: "100%",
-          }}
-        >
+        <View style={{ height: canvasHeight, width: "100%" }}>
           {blocks.map((b) => (
             <Tile key={b.key} block={b} />
           ))}
@@ -230,8 +294,8 @@ const styles = StyleSheet.create({
   },
   tile: {
     position: "absolute",
-    // Soft, low-contrast shadow — keeps any non-transparent edges from
-    // feeling harsh against the card background.
+    // Subtle shadow under each item — barely visible on a transparent PNG,
+    // softens any non-removed edges on the fallback originals.
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 10,
