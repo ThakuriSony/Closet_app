@@ -27,6 +27,15 @@ export function ItemTile({
 }: ItemTileProps) {
   const colors = useColors();
   const isDirty = item.status === "dirty";
+
+  const processedImageUri = item.processedImageUri ?? null;
+  const displayUri = processedImageUri ?? item.imageUri;
+  const hasProcessed = !!processedImageUri;
+
+  if (hasProcessed) {
+    console.log("Using processed image:", processedImageUri);
+  }
+
   return (
     <Pressable
       onPress={onPress}
@@ -44,13 +53,16 @@ export function ItemTile({
       <View
         style={[
           styles.imageWrap,
-          { backgroundColor: colors.secondary, aspectRatio },
+          {
+            backgroundColor: hasProcessed ? "#F1F1F1" : colors.secondary,
+            aspectRatio,
+          },
         ]}
       >
         <Image
-          source={{ uri: item.imageUri }}
+          source={{ uri: displayUri }}
           style={styles.image}
-          contentFit="cover"
+          contentFit={hasProcessed ? "contain" : "cover"}
           transition={150}
         />
         {isDirty ? (

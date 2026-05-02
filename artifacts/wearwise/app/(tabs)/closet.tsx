@@ -191,11 +191,11 @@ export default function ClosetScreen() {
                     key={columnIndex}
                     style={[styles.masonryColumn, { gap: GAP }]}
                   >
-                    {column.map(({ item, aspectRatio }) => (
+                    {column.map(({ item }) => (
                       <ItemTile
                         key={item.id}
                         item={item}
-                        aspectRatio={aspectRatio}
+                        aspectRatio={1}
                         onPress={() => router.push(`/item/${item.id}`)}
                         onToggleFavorite={() => {
                           if (Platform.OS !== "web") {
