@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import React, { useState } from "react";
+import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
@@ -11,62 +11,8 @@ interface Props {
 }
 
 // ---------------------------------------------------------------------------
-// Composition system (Pinterest / editorial flat-lay)
+// Helpers
 // ---------------------------------------------------------------------------
-//
-// The layout is built around a few hard rules:
-//
-//   1. NORMALIZED BOUNDING BOXES PER CATEGORY
-//      Every item lives inside a fixed-aspect box decided by its category:
-//        - Top         → 1 : 1   (square)
-//        - Bottom      → 3 : 4   (vertical)   ← anchor
-//        - Outerwear   → 1 : 1   (square)
-//        - Shoes       → 4 : 3   (horizontal)
-//        - Accessory   → 1 : 1   (small square, clustered)
-//      Combined with `contentFit="contain"` and the server-side `crop=true`
-//      we send to remove.bg, every item ends up visually weighted the same
-//      way regardless of how the source photo was framed.
-//
-//   2. ANCHOR + RELATIVE POSITIONING
-//      The BOTTOM piece is the anchor. Every other slot's position is
-//      derived from the bottom's box. If bottom is missing, the top becomes
-//      the anchor and we recenter from there.
-//
-//   3. TWO ALIGNMENT SPINES (asymmetric, not mirrored)
-//      Left column items share an x-center spine (~0.27 of canvas width).
-//      Right column items share a different spine (~0.78). The spines
-//      themselves are offset, so the layout reads asymmetric overall while
-//      each column still feels deliberate.
-//
-//   4. ACCESSORY CLUSTER
-//      Up to 3 accessories render as a tight grouped unit on the right
-//      column, never scattered.
-//
-//   5. NEGATIVE SPACE
-//      Canvas height = width × 1.18. Items collectively occupy ~70% of
-//      canvas area; the remaining ~30% is intentional whitespace.
-
-type SlotKind = "top" | "bottom" | "shoes" | "outerwear" | "accessory";
-
-interface LayoutBlock {
-  key: string;
-  kind: SlotKind;
-  uri: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  z: number;
-}
-
-// Aspect ratio (width / height) of each category's bounding box.
-const ASPECT: Record<SlotKind, number> = {
-  top: 1, // 1:1
-  bottom: 3 / 4, // 3:4 vertical
-  outerwear: 1, // 1:1
-  shoes: 4 / 3, // 4:3 horizontal
-  accessory: 1, // small square
-};
 
 function displayUri(item: ClothingItem): string {
   return item.processedImageUri && item.processedImageUri.length > 0
@@ -74,160 +20,63 @@ function displayUri(item: ClothingItem): string {
     : item.imageUri;
 }
 
-// Returns the layout blocks for the given canvas size and outfit.
-function compose(
-  canvasW: number,
-  canvasH: number,
-  outfit: GeneratedOutfit,
-): LayoutBlock[] {
-  const blocks: LayoutBlock[] = [];
+// ---------------------------------------------------------------------------
+// Single clothing card
+// ---------------------------------------------------------------------------
 
-  // Spines define the x-center of each column. Slight asymmetry between them
-  // (left at 0.30, right at 0.74) keeps the composition off-center.
-  const spineLeft = canvasW * 0.3;
-  const spineRight = canvasW * 0.74;
-
-  // Anchor: BOTTOM (3:4). Width is the dominant slot in the layout.
-  const bottomW = canvasW * 0.5;
-  const bottomH = bottomW / ASPECT.bottom; // 3:4 → height = w * 4/3
-  const bottomX = spineLeft - bottomW / 2;
-  // Position the bottom so it sits in the lower portion of the canvas with
-  // a small margin from the bottom edge.
-  const bottomY = canvasH - bottomH - canvasH * 0.04;
-  if (outfit.bottom) {
-    blocks.push({
-      key: `bottom:${outfit.bottom.id}`,
-      kind: "bottom",
-      uri: displayUri(outfit.bottom),
-      x: bottomX,
-      y: bottomY,
-      w: bottomW,
-      h: bottomH,
-      z: 3,
-    });
+function ItemCard({ item, label }: { item: ClothingItem | null | undefined; label?: string }) {
+  if (!item) {
+    // Empty placeholder — preserves grid structure without shifting siblings
+    return <View style={styles.cardEmpty} />;
   }
-
-  // TOP (1:1) sits above the bottom on the same spine, with a small
-  // breathing gap. If there's no bottom, recenter near the top of the canvas.
-  const topW = canvasW * 0.42;
-  const topH = topW / ASPECT.top;
-  const topX = spineLeft - topW / 2;
-  const topY = outfit.bottom
-    ? Math.max(canvasH * 0.03, bottomY - topH - canvasH * 0.025)
-    : canvasH * 0.08;
-  if (outfit.top) {
-    blocks.push({
-      key: `top:${outfit.top.id}`,
-      kind: "top",
-      uri: displayUri(outfit.top),
-      x: topX,
-      y: topY,
-      w: topW,
-      h: topH,
-      z: 2,
-    });
-  }
-
-  // OUTERWEAR (1:1) — small, near the top of the right column, deliberately
-  // offset toward the right edge so it reads as "pinned" rather than
-  // mirroring the top.
-  const outerW = canvasW * 0.3;
-  const outerH = outerW / ASPECT.outerwear;
-  const outerX = canvasW - outerW - canvasW * 0.03;
-  const outerY = canvasH * 0.03;
-  if (outfit.outerwear) {
-    blocks.push({
-      key: `outerwear:${outfit.outerwear.id}`,
-      kind: "outerwear",
-      uri: displayUri(outfit.outerwear),
-      x: outerX,
-      y: outerY,
-      w: outerW,
-      h: outerH,
-      z: 1,
-    });
-  }
-
-  // SHOES (4:3) — middle of the right column, on the right spine. If there's
-  // no outerwear, shoes lift higher to fill the visual gap at the top.
-  const shoesW = canvasW * 0.36;
-  const shoesH = shoesW / ASPECT.shoes;
-  const shoesX = spineRight - shoesW / 2;
-  const shoesY = outfit.outerwear
-    ? outerY + outerH + canvasH * 0.03
-    : canvasH * 0.18;
-  if (outfit.shoes) {
-    blocks.push({
-      key: `shoes:${outfit.shoes.id}`,
-      kind: "shoes",
-      uri: displayUri(outfit.shoes),
-      x: shoesX,
-      y: shoesY,
-      w: shoesW,
-      h: shoesH,
-      z: 4,
-    });
-  }
-
-  // ACCESSORY CLUSTER — up to 3 items, grouped on the right spine below the
-  // shoes. Layout depends on count:
-  //   1 → single tile, centered
-  //   2 → side-by-side
-  //   3 → triangle (two on top, one centered below)
-  const accessories = (outfit.accessories ?? []).slice(0, 3);
-  if (accessories.length > 0) {
-    const tile = canvasW * 0.18; // each accessory tile is ~18% wide
-    const gap = canvasW * 0.02;
-    const clusterTop = outfit.shoes
-      ? shoesY + shoesH + canvasH * 0.03
-      : canvasH * 0.45;
-
-    type Pos = { dx: number; dy: number };
-    const positionsByCount: Record<number, Pos[]> = {
-      1: [{ dx: 0, dy: 0 }],
-      2: [
-        { dx: -(tile / 2 + gap / 2), dy: 0 },
-        { dx: tile / 2 + gap / 2, dy: 0 },
-      ],
-      3: [
-        { dx: -(tile / 2 + gap / 2), dy: 0 },
-        { dx: tile / 2 + gap / 2, dy: 0 },
-        { dx: 0, dy: tile + gap },
-      ],
-    };
-    const positions = positionsByCount[accessories.length] ?? [];
-    accessories.forEach((acc, i) => {
-      const p = positions[i];
-      if (!p) return;
-      blocks.push({
-        key: `accessory:${acc.id}`,
-        kind: "accessory",
-        uri: displayUri(acc),
-        x: spineRight + p.dx - tile / 2,
-        y: clusterTop + p.dy,
-        w: tile,
-        h: tile / ASPECT.accessory,
-        z: 5,
-      });
-    });
-  }
-
-  return blocks;
+  return (
+    <View style={styles.card}>
+      <Image
+        source={{ uri: displayUri(item) }}
+        style={styles.cardImage}
+        contentFit="contain"
+        transition={150}
+      />
+      {label ? (
+        <Text style={styles.cardLabel} numberOfLines={1}>
+          {label}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 // ---------------------------------------------------------------------------
-// View
+// Grid layout
+// ---------------------------------------------------------------------------
+//
+// The 2 × 2 grid follows three deterministic cases:
+//
+//   Case 1 — Normal (top + bottom + shoes, no outerwear):
+//     top-left  = Top      top-right  = Shoes
+//     bot-left  = Bottom   bot-right  = [empty]
+//
+//   Case 2 — With outerwear:
+//     top-left  = Top      top-right  = Outerwear
+//     bot-left  = Bottom   bot-right  = Shoes
+//
+//   Case 3 — Dress (top but no bottom):
+//     top-left  = Top      top-right  = Shoes
+//     bot-left  = [empty]  bot-right  = [empty]
+//
+// Slots that are null render as empty squares — they hold space without
+// collapsing the column so the layout never shifts.
+
+// ---------------------------------------------------------------------------
+// Main export
 // ---------------------------------------------------------------------------
 
 export function OutfitPreview({ outfit }: Props) {
   const colors = useColors();
-  const [width, setWidth] = useState(0);
 
   if (!outfit) {
     return (
-      <View
-        style={[styles.empty, { backgroundColor: colors.secondary }]}
-      >
+      <View style={[styles.empty, { backgroundColor: colors.secondary }]}>
         <View style={styles.emptyDot} />
         <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
           Ready to dress?
@@ -239,69 +88,99 @@ export function OutfitPreview({ outfit }: Props) {
     );
   }
 
-  // Canvas height ~1.18× width gives the bottom anchor room to breathe and
-  // leaves ~25–30% negative space overall.
-  const canvasHeight = width > 0 ? Math.round(width * 1.18) : 0;
+  const hasOuterwear = !!outfit.outerwear;
 
-  const blocks =
-    width > 0 && canvasHeight > 0 ? compose(width, canvasHeight, outfit) : [];
+  // Resolve the four grid slots
+  const topLeft   = outfit.top;
+  const bottomLeft = outfit.bottom ?? null;
+  const topRight  = hasOuterwear ? outfit.outerwear : (outfit.shoes ?? null);
+  const bottomRight = hasOuterwear ? (outfit.shoes ?? null) : null;
 
   return (
-    <View
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-      style={[styles.card, { backgroundColor: colors.secondary }]}
-    >
-      {width > 0 ? (
-        <View style={{ height: canvasHeight, width: "100%" }}>
-          {blocks.map((b) => (
-            <Tile key={b.key} block={b} />
-          ))}
+    <View style={styles.container}>
+      {/* Subtle grid-line effect: EAEAEA background shows through the 2 px gap */}
+      <View style={styles.grid}>
+        {/* Left column */}
+        <View style={styles.column}>
+          <ItemCard item={topLeft} />
+          <ItemCard item={bottomLeft} />
         </View>
-      ) : null}
+
+        {/* Right column */}
+        <View style={styles.column}>
+          <ItemCard item={topRight} />
+          <ItemCard item={bottomRight} />
+        </View>
+      </View>
     </View>
   );
 }
 
-function Tile({ block }: { block: LayoutBlock }) {
-  return (
-    <View
-      style={[
-        styles.tile,
-        {
-          left: block.x,
-          top: block.y,
-          width: block.w,
-          height: block.h,
-          zIndex: block.z,
-        },
-      ]}
-    >
-      <Image
-        source={{ uri: block.uri }}
-        style={{ width: "100%", height: "100%" }}
-        contentFit="contain"
-        transition={150}
-      />
-    </View>
-  );
-}
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
+const CARD_BORDER_RADIUS = 16;
+const GRID_GAP = 2;   // gap between cells — EAEAEA background peeks through
 
 const styles = StyleSheet.create({
-  card: {
+  // Outer container: white background, rounded, padded
+  container: {
+    backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 22,
+    padding: 20,
+  },
+
+  // Inner wrapper carries the EAEAEA grid-line colour and renders the gaps
+  grid: {
+    backgroundColor: "#EAEAEA",
+    borderRadius: CARD_BORDER_RADIUS + 2,
+    flexDirection: "row",
+    gap: GRID_GAP,
     overflow: "hidden",
   },
-  tile: {
-    position: "absolute",
-    // Subtle shadow under each item — barely visible on a transparent PNG,
-    // softens any non-removed edges on the fallback originals.
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+
+  column: {
+    flex: 1,
+    gap: GRID_GAP,
   },
+
+  // Occupied card
+  card: {
+    backgroundColor: "#F1F1F1",
+    borderRadius: CARD_BORDER_RADIUS,
+    aspectRatio: 1,
+    padding: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+
+  // Empty placeholder — same dimensions as a card, invisible
+  cardEmpty: {
+    backgroundColor: "#F1F1F1",
+    borderRadius: CARD_BORDER_RADIUS,
+    aspectRatio: 1,
+    opacity: 0,
+  },
+
+  cardImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  cardLabel: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    right: 6,
+    fontSize: 9,
+    fontFamily: "Inter_500Medium",
+    color: "#6B6B6B",
+    textAlign: "center",
+  },
+
+  // Empty-state card (no outfit generated yet)
   empty: {
     borderRadius: 20,
     paddingVertical: 48,
