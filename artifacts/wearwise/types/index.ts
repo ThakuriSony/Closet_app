@@ -28,12 +28,33 @@ export const DIRTY_THRESHOLD_MIN = 1;
 export const DIRTY_THRESHOLD_MAX = 5;
 export const DIRTY_THRESHOLD_DEFAULT = 2;
 
-// Position/scale of a single item on a lookbook canvas.
+/**
+ * One clothing item placed on a Studio canvas, stored in normalised coords.
+ *
+ *   nx  = x / canvasW  (0 – 1)
+ *   ny  = y / canvasH  (0 – 1)
+ *   s   = scale  (unitless; 1 = CANVAS_ITEM_SIZE)
+ *   z   = paint order  (higher = rendered on top)
+ */
 export interface LookbookItem {
   itemId: string;
-  x: number;
-  y: number;
-  scale: number;
+  nx: number;
+  ny: number;
+  s: number;
+  z: number;
+}
+
+/**
+ * Canvas dimensions captured at save time, used to reconstruct absolute
+ * pixel positions in both the Studio editor and the preview thumbnail.
+ *
+ *   baseSizeFactor = CANVAS_ITEM_SIZE / canvasW
+ *     → item pixel size in any viewport = s × baseSizeFactor × viewportW
+ */
+export interface LookbookMeta {
+  canvasW: number;
+  canvasH: number;
+  baseSizeFactor: number;
 }
 
 export interface Outfit {
@@ -41,11 +62,9 @@ export interface Outfit {
   itemIds: string[];
   createdAt: number;
   isFavorite: boolean;
-  // "generated" = created by the outfit engine / create-outfit screen (default)
-  // "lookbook"  = created in the Studio canvas editor
   type?: "generated" | "lookbook";
-  // Canvas layout — only present on lookbook outfits
   layout?: LookbookItem[];
+  layoutMeta?: LookbookMeta;
 }
 
 export type EventCategory =

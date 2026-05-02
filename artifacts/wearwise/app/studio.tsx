@@ -1,7 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,18 +23,19 @@ import { CanvasItem, CANVAS_ITEM_SIZE } from "@/components/CanvasItem";
 import { SelectItemsModal } from "@/components/SelectItemsModal";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
-import type { LookbookItem } from "@/types";
+import type { LookbookItem, LookbookMeta } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface CanvasEntry {
-  id: string; // unique per canvas slot (allows same item twice)
+  id: string;     // unique per canvas slot
   itemId: string;
-  x: number;
+  x: number;      // absolute pixel position within the canvas view
   y: number;
   scale: number;
+  z: number;      // paint order — higher = rendered on top
 }
 
 function genId(): string {
@@ -100,26 +107,50 @@ export default function StudioScreen() {
   const [canvasDims, setCanvasDims] = useState({ width: 0, height: 0 });
   const [saving, setSaving] = useState(false);
 
-  // Preload existing layout when editing a saved lookbook outfit.
+  // Monotonically increasing z counter — each tap/import bumps it.
+  const zCounterRef = useRef(0);
+  // Prevents re-applying the saved layout after the user starts editing.
+  const loadedRef = useRef(false);
+
+  // Find the outfit we're editing (memoised on id only — stable across renders).
   const existingOutfit = useMemo(
     () => (id ? outfits.find((o) => o.id === id) : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [id], // intentionally shallow — only run once on mount
+    [id],
   );
 
+  // Once the canvas has been measured, denormalise saved layout into absolute px.
   useEffect(() => {
-    if (existingOutfit?.layout && existingOutfit.layout.length > 0) {
-      setCanvasEntries(
-        existingOutfit.layout.map((l) => ({
-          id: genId(),
-          itemId: l.itemId,
-          x: l.x,
-          y: l.y,
-          scale: l.scale,
-        })),
-      );
-    }
-  }, [existingOutfit]);
+    if (
+      canvasDims.width === 0 ||
+      !existingOutfit?.layout?.length ||
+      loadedRef.current
+    )
+      return;
+    loadedRef.current = true;
+
+    const meta = existingOutfit.layoutMeta;
+    // Use stored canvas dimensions if available, else fall back to current.
+    const cW = meta?.canvasW ?? canvasDims.width;
+    const cH = meta?.canvasH ?? canvasDims.height;
+
+    const maxZ = existingOutfit.layout.reduce(
+      (m, l) => Math.max(m, l.z ?? 0),
+      0,
+    );
+    zCounterRef.current = maxZ;
+
+    setCanvasEntries(
+      existingOutfit.layout.map((l, idx) => ({
+        id: genId(),
+        itemId: l.itemId,
+        x: l.nx * cW,
+        y: l.ny * cH,
+        scale: l.s,
+        z: l.z ?? idx,
+      })),
+    );
+  }, [canvasDims.width, canvasDims.height, existingOutfit]);
 
   // -------------------------------------------------------------------------
   // Canvas item helpers
@@ -128,14 +159,9 @@ export default function StudioScreen() {
   const initialPosition = useCallback(
     (index: number): { x: number; y: number } => {
       const { width, height } = canvasDims;
-      const baseX =
-        width > 0 ? (width - CANVAS_ITEM_SIZE) / 2 : 80;
-      const baseY =
-        height > 0 ? (height - CANVAS_ITEM_SIZE) / 2 : 120;
-      return {
-        x: baseX + index * 24,
-        y: baseY + index * 24,
-      };
+      const baseX = width > 0 ? (width - CANVAS_ITEM_SIZE) / 2 : 80;
+      const baseY = height > 0 ? (height - CANVAS_ITEM_SIZE) / 2 : 120;
+      return { x: baseX + index * 28, y: baseY + index * 28 };
     },
     [canvasDims],
   );
@@ -143,14 +169,16 @@ export default function StudioScreen() {
   const handleImport = useCallback(
     (itemIds: string[]) => {
       setCanvasEntries((prev) => {
+        const maxZ = prev.reduce((m, e) => Math.max(m, e.z), 0);
         const newEntries = itemIds.map((itemId, i) => {
-          const pos = initialPosition(prev.length + i);
+          const z = maxZ + i + 1;
+          zCounterRef.current = z;
           return {
             id: genId(),
             itemId,
-            x: pos.x,
-            y: pos.y,
+            ...initialPosition(prev.length + i),
             scale: 1,
+            z,
           };
         });
         return [...prev, ...newEntries];
@@ -168,8 +196,14 @@ export default function StudioScreen() {
     [],
   );
 
+  // Tap brings the item to the front by assigning the next z value.
   const handleSelect = useCallback((entryId: string) => {
     setSelectedEntryId((prev) => (prev === entryId ? null : entryId));
+    zCounterRef.current += 1;
+    const z = zCounterRef.current;
+    setCanvasEntries((prev) =>
+      prev.map((e) => (e.id === entryId ? { ...e, z } : e)),
+    );
   }, []);
 
   const handleDeleteSelected = () => {
@@ -178,20 +212,19 @@ export default function StudioScreen() {
     setSelectedEntryId(null);
   };
 
-  const handleCanvasTap = () => {
-    setSelectedEntryId(null);
-  };
+  // Render entries sorted by z so the highest z paints last (on top).
+  const sortedEntries = useMemo(
+    () => [...canvasEntries].sort((a, b) => a.z - b.z),
+    [canvasEntries],
+  );
 
   // -------------------------------------------------------------------------
-  // Save
+  // Save — normalise absolute px → 0–1 before storing
   // -------------------------------------------------------------------------
 
   const handleSave = async () => {
     if (canvasEntries.length === 0) {
-      Alert.alert(
-        "Canvas is empty",
-        "Add at least one item before saving.",
-      );
+      Alert.alert("Canvas is empty", "Add at least one item before saving.");
       return;
     }
 
@@ -201,20 +234,29 @@ export default function StudioScreen() {
 
     setSaving(true);
     try {
+      const cW = canvasDims.width;
+      const cH = canvasDims.height;
+
       const layout: LookbookItem[] = canvasEntries.map((e) => ({
         itemId: e.itemId,
-        x: e.x,
-        y: e.y,
-        scale: e.scale,
+        nx: cW > 0 ? e.x / cW : 0,
+        ny: cH > 0 ? e.y / cH : 0,
+        s: e.scale,
+        z: e.z,
       }));
+
+      const layoutMeta: LookbookMeta = {
+        canvasW: cW,
+        canvasH: cH,
+        baseSizeFactor: cW > 0 ? CANVAS_ITEM_SIZE / cW : 0.38,
+      };
+
       const itemIds = [...new Set(canvasEntries.map((e) => e.itemId))];
 
       if (id) {
-        // Edit mode — update existing outfit.
-        await updateOutfit(id, { itemIds, layout, type: "lookbook" });
+        await updateOutfit(id, { itemIds, layout, layoutMeta, type: "lookbook" });
       } else {
-        // Create mode.
-        await addOutfit(itemIds, { type: "lookbook", layout });
+        await addOutfit(itemIds, { type: "lookbook", layout, layoutMeta });
       }
 
       if (Platform.OS !== "web") {
@@ -240,10 +282,7 @@ export default function StudioScreen() {
       <View
         style={[
           styles.header,
-          {
-            paddingTop: insets.top + 10,
-            borderBottomColor: colors.border,
-          },
+          { paddingTop: insets.top + 10, borderBottomColor: colors.border },
         ]}
       >
         <Pressable
@@ -259,7 +298,9 @@ export default function StudioScreen() {
         </Text>
 
         <Pressable
-          onPress={() => { void handleSave(); }}
+          onPress={() => {
+            void handleSave();
+          }}
           disabled={saving}
           style={({ pressed }) => [
             styles.saveBtn,
@@ -267,14 +308,9 @@ export default function StudioScreen() {
           ]}
         >
           {saving ? (
-            <ActivityIndicator
-              size="small"
-              color={colors.primaryForeground}
-            />
+            <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : (
-            <Text
-              style={[styles.saveLabel, { color: colors.primaryForeground }]}
-            >
+            <Text style={[styles.saveLabel, { color: colors.primaryForeground }]}>
               {id ? "Update" : "Save"}
             </Text>
           )}
@@ -291,18 +327,16 @@ export default function StudioScreen() {
           })
         }
       >
-        <CanvasGrid
-          width={canvasDims.width}
-          height={canvasDims.height}
-        />
+        <CanvasGrid width={canvasDims.width} height={canvasDims.height} />
 
-        {/* Tap on blank canvas area to deselect */}
+        {/* Tap blank canvas area to deselect */}
         <Pressable
           style={StyleSheet.absoluteFillObject}
-          onPress={handleCanvasTap}
+          onPress={() => setSelectedEntryId(null)}
         />
 
-        {canvasEntries.map((entry) => {
+        {/* Items rendered in z-order (lowest z first, highest z on top) */}
+        {sortedEntries.map((entry) => {
           const item = getItem(entry.itemId);
           if (!item) return null;
           return (
@@ -320,14 +354,10 @@ export default function StudioScreen() {
           );
         })}
 
-        {/* Subtle bottom hint — only shown when canvas is empty */}
-        {canvasEntries.length === 0 && (
+        {/* Closet-empty hint (only when canvas is empty) */}
+        {canvasEntries.length === 0 && emptyCloset && (
           <View style={styles.hint} pointerEvents="none">
-            <Text style={styles.hintText}>
-              {emptyCloset
-                ? "Add items to your Closet first"
-                : ""}
-            </Text>
+            <Text style={styles.hintText}>Add items to your Closet first</Text>
           </View>
         )}
       </View>
@@ -343,7 +373,6 @@ export default function StudioScreen() {
           },
         ]}
       >
-        {/* Delete selected item */}
         <Pressable
           onPress={handleDeleteSelected}
           disabled={!selectedEntryId}
@@ -360,7 +389,6 @@ export default function StudioScreen() {
           />
         </Pressable>
 
-        {/* Deselect / hint label */}
         {selectedEntryId ? (
           <Text style={[styles.barHint, { color: colors.mutedForeground }]}>
             Item selected
@@ -371,7 +399,6 @@ export default function StudioScreen() {
           </Text>
         )}
 
-        {/* Add items */}
         <Pressable
           onPress={() => {
             if (emptyCloset) {
@@ -385,10 +412,7 @@ export default function StudioScreen() {
           }}
           style={({ pressed }) => [
             styles.addBtn,
-            {
-              backgroundColor: colors.primary,
-              opacity: pressed ? 0.85 : 1,
-            },
+            { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
           ]}
         >
           <Feather name="plus" size={22} color={colors.primaryForeground} />
@@ -441,13 +465,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    gap: 14,
   },
   hintText: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Inter_500Medium",
-    color: "rgba(0,0,0,0.3)",
-    textAlign: "center",
+    color: "rgba(0,0,0,0.28)",
   },
 
   bar: {

@@ -8,7 +8,13 @@ import React, {
   useState,
 } from "react";
 
-import type { Category, ClothingItem, LookbookItem, Outfit } from "@/types";
+import type {
+  Category,
+  ClothingItem,
+  LookbookItem,
+  LookbookMeta,
+  Outfit,
+} from "@/types";
 
 const ITEMS_KEY = "wearwise:items:v1";
 const OUTFITS_KEY = "wearwise:outfits:v1";
@@ -43,13 +49,17 @@ function normalizeOutfit(raw: Partial<Outfit> & { id: string }): Outfit {
     createdAt: raw.createdAt ?? Date.now(),
     isFavorite: raw.isFavorite === true,
     type: raw.type === "lookbook" ? "lookbook" : "generated",
-    layout: Array.isArray(raw.layout) ? (raw.layout as LookbookItem[]) : undefined,
+    layout: Array.isArray(raw.layout)
+      ? (raw.layout as LookbookItem[])
+      : undefined,
+    layoutMeta: raw.layoutMeta ?? undefined,
   };
 }
 
 interface AddOutfitOpts {
   type?: "generated" | "lookbook";
   layout?: LookbookItem[];
+  layoutMeta?: LookbookMeta;
 }
 
 interface WardrobeContextValue {
@@ -68,7 +78,7 @@ interface WardrobeContextValue {
   addOutfit: (itemIds: string[], opts?: AddOutfitOpts) => Promise<Outfit>;
   updateOutfit: (
     id: string,
-    changes: Partial<Pick<Outfit, "itemIds" | "type" | "layout">>,
+    changes: Partial<Pick<Outfit, "itemIds" | "type" | "layout" | "layoutMeta">>,
   ) => Promise<void>;
   removeOutfit: (id: string) => Promise<void>;
   markItemsWorn: (itemIds: string[], dirtyThreshold: number) => Promise<void>;
@@ -186,6 +196,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         isFavorite: false,
         type: opts?.type ?? "generated",
         layout: opts?.layout,
+        layoutMeta: opts?.layoutMeta,
       };
       const next = [outfit, ...outfits];
       await persistOutfits(next);
