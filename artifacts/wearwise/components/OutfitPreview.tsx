@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
@@ -17,12 +17,60 @@ function displayUri(item: ClothingItem): string {
 }
 
 // ---------------------------------------------------------------------------
-// Single clothing slot
+// Decorative grid-line background (section wrapper only)
+// ---------------------------------------------------------------------------
+
+const LINE_COLOR = "#D3D3D3";
+const LINE_SPACING = 28;
+const LINE_WIDTH = StyleSheet.hairlineWidth;
+
+function GridBackground({ width, height }: { width: number; height: number }) {
+  if (width === 0 || height === 0) return null;
+
+  const hLines: number[] = [];
+  for (let y = LINE_SPACING; y < height; y += LINE_SPACING) hLines.push(y);
+
+  const vLines: number[] = [];
+  for (let x = LINE_SPACING; x < width; x += LINE_SPACING) vLines.push(x);
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {hLines.map((y) => (
+        <View
+          key={`h${y}`}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: y,
+            height: LINE_WIDTH,
+            backgroundColor: LINE_COLOR,
+          }}
+        />
+      ))}
+      {vLines.map((x) => (
+        <View
+          key={`v${x}`}
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: x,
+            width: LINE_WIDTH,
+            backgroundColor: LINE_COLOR,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Single clothing slot — no background, no border
 // ---------------------------------------------------------------------------
 
 function ItemCard({ item }: { item: ClothingItem | null | undefined }) {
   if (!item) {
-    // Transparent placeholder — holds its grid slot without any visual chrome
     return <View style={styles.cardEmpty} />;
   }
   return (
@@ -55,6 +103,7 @@ function ItemCard({ item }: { item: ClothingItem | null | undefined }) {
 
 export function OutfitPreview({ outfit }: Props) {
   const colors = useColors();
+  const [dims, setDims] = useState({ width: 0, height: 0 });
 
   if (!outfit) {
     return (
@@ -72,13 +121,25 @@ export function OutfitPreview({ outfit }: Props) {
 
   const hasOuterwear = !!outfit.outerwear;
 
-  const topLeft    = outfit.top     ?? null;
-  const bottomLeft = outfit.bottom  ?? null;
-  const topRight   = hasOuterwear ? (outfit.outerwear ?? null) : (outfit.shoes ?? null);
-  const bottomRight = hasOuterwear ? (outfit.shoes ?? null) : null;
+  const topLeft     = outfit.top      ?? null;
+  const bottomLeft  = outfit.bottom   ?? null;
+  const topRight    = hasOuterwear ? (outfit.outerwear ?? null) : (outfit.shoes ?? null);
+  const bottomRight = hasOuterwear ? (outfit.shoes    ?? null) : null;
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onLayout={(e) =>
+        setDims({
+          width: e.nativeEvent.layout.width,
+          height: e.nativeEvent.layout.height,
+        })
+      }
+    >
+      {/* Off-white (#FAF7F0) base + subtle grid lines — section only */}
+      <GridBackground width={dims.width} height={dims.height} />
+
+      {/* 2 × 2 image grid — images sit directly on the background */}
       <View style={styles.grid}>
         <View style={styles.column}>
           <ItemCard item={topLeft} />
@@ -100,14 +161,18 @@ export function OutfitPreview({ outfit }: Props) {
 const CELL_GAP = 10;
 
 const styles = StyleSheet.create({
-  // Outer wrapper — transparent, keeps padding so items don't run edge-to-edge
+  // Section wrapper: off-white background + grid lines
   container: {
-    paddingVertical: 8,
+    backgroundColor: "#FAF7F0",
+    borderRadius: 20,
+    padding: 20,
+    overflow: "hidden",
   },
 
   grid: {
     flexDirection: "row",
     gap: CELL_GAP,
+    zIndex: 1,
   },
 
   column: {
@@ -115,7 +180,7 @@ const styles = StyleSheet.create({
     gap: CELL_GAP,
   },
 
-  // No background, no border — just a sized slot for the image
+  // No background, no border — image floats on the section background
   card: {
     aspectRatio: 1,
     padding: 6,
@@ -123,7 +188,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // Invisible placeholder — identical dimensions to a card
   cardEmpty: {
     aspectRatio: 1,
   },
