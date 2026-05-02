@@ -1,0 +1,36 @@
+IMPORTANT CONSTRAINTS — read before touching anything:
+
+Only modify the StackedOutfitPreview component in lib/screens/outfits.tsx
+Do not touch any other file, any other component, any other function
+Do not change how outfits are saved, how items are stored, or any data structure
+Do not remove or rename any props that StackedOutfitPreview receives — only change what happens inside it
+Do not change any imports unless you are ONLY adding Svg and Line from react-native-svg — that package is already installed, do not install anything new
+If react-native-svg is not already imported in this file, add it to the existing imports at the top. Do not change any other import line.
+Before making any change, confirm that react-native-svg is already used elsewhere in the project so we know it's available
+After making changes, show me the full rewritten component AND the updated import line only — nothing else
+
+Now fix the StackedOutfitPreview component in lib/screens/outfits.tsx with these exact rules:
+Problem 1 — uniform sizing (bottom items render too small):
+
+Pick one fixed item width: ITEM_W = cardWidth * 0.72
+Every single item uses this exact same width. No exceptions. Not less for bottoms or shoes. The same number for every item.
+Each item's height = ITEM_W * (item's own aspect ratio). Aspect ratio = originalHeight/originalWidth. If not stored, use 1.3 for tops/outerwear, 1.8 for bottoms, 0.6 for shoes.
+Add up all item heights + gaps to get totalStackHeight
+If totalStackHeight is too tall for the card, calculate scale = availableCardHeight / totalStackHeight
+Multiply ITEM_W, ALL item heights, AND all gaps by this same scale value
+This scale is calculated ONCE and applied to EVERYTHING identically. Never scale individual items differently from each other.
+
+Problem 2 — restore the grid background:
+
+Card background color must be #f5f2ed
+Draw a grid using react-native-svg with <Svg> and <Line> using StyleSheet.absoluteFill
+Horizontal and vertical lines every 18px
+Line color: rgba(180,172,160,0.45), strokeWidth: 0.5
+Add pointerEvents="none" to the Svg so it never blocks taps
+
+Sort order for items:
+
+outerwear/jacket/coat first → then top/shirt/tshirt/blouse → then bottom/pants/skirt/jeans → then shoes/heels/boots/sneakers → then everything else last
+Match by checking if the item's category field contains any of those words, case insensitive
+
+After making the changes, show me the complete rewritten StackedOutfitPreview function and the updated import line so I can verify before running.
