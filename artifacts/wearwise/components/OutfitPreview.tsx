@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import React, { useState } from "react";
+import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
@@ -10,10 +10,6 @@ interface Props {
   outfit: GeneratedOutfit | null;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function displayUri(item: ClothingItem): string {
   return item.processedImageUri && item.processedImageUri.length > 0
     ? item.processedImageUri
@@ -21,64 +17,12 @@ function displayUri(item: ClothingItem): string {
 }
 
 // ---------------------------------------------------------------------------
-// Decorative grid-line background
-// ---------------------------------------------------------------------------
-// Renders evenly-spaced horizontal + vertical hairlines over the warm
-// off-white (#FAF7F0) base. Lines are purely cosmetic absolute Views; they
-// sit beneath the card grid via zIndex ordering.
-
-const LINE_COLOR = "#D3D3D3";
-const LINE_SPACING = 28; // px between grid lines
-const LINE_WIDTH = StyleSheet.hairlineWidth;
-
-function GridBackground({ width, height }: { width: number; height: number }) {
-  if (width === 0 || height === 0) return null;
-
-  const hLines: number[] = [];
-  for (let y = LINE_SPACING; y < height; y += LINE_SPACING) hLines.push(y);
-
-  const vLines: number[] = [];
-  for (let x = LINE_SPACING; x < width; x += LINE_SPACING) vLines.push(x);
-
-  return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      {hLines.map((y) => (
-        <View
-          key={`h${y}`}
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: y,
-            height: LINE_WIDTH,
-            backgroundColor: LINE_COLOR,
-          }}
-        />
-      ))}
-      {vLines.map((x) => (
-        <View
-          key={`v${x}`}
-          style={{
-            position: "absolute",
-            top: 0,
-            bottom: 0,
-            left: x,
-            width: LINE_WIDTH,
-            backgroundColor: LINE_COLOR,
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Single clothing card
+// Single clothing slot
 // ---------------------------------------------------------------------------
 
 function ItemCard({ item }: { item: ClothingItem | null | undefined }) {
   if (!item) {
-    // Invisible placeholder — holds its slot so the grid never shifts
+    // Transparent placeholder — holds its grid slot without any visual chrome
     return <View style={styles.cardEmpty} />;
   }
   return (
@@ -111,7 +55,6 @@ function ItemCard({ item }: { item: ClothingItem | null | undefined }) {
 
 export function OutfitPreview({ outfit }: Props) {
   const colors = useColors();
-  const [dims, setDims] = useState({ width: 0, height: 0 });
 
   if (!outfit) {
     return (
@@ -129,25 +72,13 @@ export function OutfitPreview({ outfit }: Props) {
 
   const hasOuterwear = !!outfit.outerwear;
 
-  const topLeft    = outfit.top ?? null;
-  const bottomLeft = outfit.bottom ?? null;
+  const topLeft    = outfit.top     ?? null;
+  const bottomLeft = outfit.bottom  ?? null;
   const topRight   = hasOuterwear ? (outfit.outerwear ?? null) : (outfit.shoes ?? null);
   const bottomRight = hasOuterwear ? (outfit.shoes ?? null) : null;
 
   return (
-    <View
-      style={styles.container}
-      onLayout={(e) =>
-        setDims({
-          width: e.nativeEvent.layout.width,
-          height: e.nativeEvent.layout.height,
-        })
-      }
-    >
-      {/* Decorative grid lines drawn on the warm off-white base */}
-      <GridBackground width={dims.width} height={dims.height} />
-
-      {/* 2 × 2 card grid — sits above the background lines */}
+    <View style={styles.container}>
       <View style={styles.grid}>
         <View style={styles.column}>
           <ItemCard item={topLeft} />
@@ -166,21 +97,17 @@ export function OutfitPreview({ outfit }: Props) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const CARD_RADIUS = 18;
 const CELL_GAP = 10;
 
 const styles = StyleSheet.create({
+  // Outer wrapper — transparent, keeps padding so items don't run edge-to-edge
   container: {
-    backgroundColor: "#FAF7F0",
-    borderRadius: 20,
-    padding: 20,
-    overflow: "hidden",
+    paddingVertical: 8,
   },
 
   grid: {
     flexDirection: "row",
     gap: CELL_GAP,
-    zIndex: 1,
   },
 
   column: {
@@ -188,21 +115,16 @@ const styles = StyleSheet.create({
     gap: CELL_GAP,
   },
 
+  // No background, no border — just a sized slot for the image
   card: {
-    backgroundColor: "#F1F1F1",
-    borderRadius: CARD_RADIUS,
     aspectRatio: 1,
-    padding: 10,
+    padding: 6,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#FFFFFF",
   },
 
+  // Invisible placeholder — identical dimensions to a card
   cardEmpty: {
-    backgroundColor: "transparent",
-    borderRadius: CARD_RADIUS,
     aspectRatio: 1,
   },
 
