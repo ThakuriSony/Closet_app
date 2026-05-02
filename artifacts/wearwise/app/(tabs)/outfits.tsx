@@ -25,7 +25,9 @@ import type { Category, ClothingItem, Outfit } from "@/types";
 
 const H_PADDING = 16;
 const COL_GAP = 10;
-const ITEM_GAP = 4; // vertical gap between stacked images
+const ITEM_GAP = 5;          // vertical gap between stacked images (px, pre-scale)
+const ITEM_WIDTH_FACTOR = 0.75; // each item = 75% of card width
+const ITEM_ASPECT = 1.35;    // portrait box — height = width × this factor
 
 // Category stacking order: top garment → bottom → shoes → accessories
 const STACK_ORDER: Partial<Record<Category, number>> = {
@@ -42,14 +44,74 @@ type OutfitFilter = "All" | "Favorites";
 // StackedOutfitPreview
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Grid background (replicates the Studio canvas dot-grid in the card)
+// ---------------------------------------------------------------------------
+
+const GRID_SPACING = 18;
+const GRID_COLOR = "rgba(180,172,160,0.55)";
+const GRID_BG = "#f5f2ed";
+
+function GridBackground({ width, height }: { width: number; height: number }) {
+  if (width === 0 || height === 0) return null;
+
+  const hLines: number[] = [];
+  for (let y = GRID_SPACING; y < height; y += GRID_SPACING) hLines.push(y);
+
+  const vLines: number[] = [];
+  for (let x = GRID_SPACING; x < width; x += GRID_SPACING) vLines.push(x);
+
+  return (
+    <View
+      style={[StyleSheet.absoluteFillObject, { backgroundColor: GRID_BG }]}
+      pointerEvents="none"
+    >
+      {hLines.map((y) => (
+        <View
+          key={`h${y}`}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: y,
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: GRID_COLOR,
+          }}
+        />
+      ))}
+      {vLines.map((x) => (
+        <View
+          key={`v${x}`}
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: x,
+            width: StyleSheet.hairlineWidth,
+            backgroundColor: GRID_COLOR,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// StackedOutfitPreview
+// ---------------------------------------------------------------------------
+
 /**
  * Renders clothing items stacked top-to-bottom ordered by category.
  *
- * Layout math:
- *   itemW  = cardW × 0.60   (60% of card width per image, square)
- *   rawH   = n × itemW + (n-1) × ITEM_GAP
- *   scale  = if rawH > availH → availH / rawH  else 1
- *   Entire stack is centered horizontally and vertically inside the card.
+ * Sizing rules (Fix 1 — uniform width):
+ *   rawItemW = cardW × ITEM_WIDTH_FACTOR   (same for every item)
+ *   rawItemH = rawItemW × ITEM_ASPECT      (portrait box — same for every item)
+ *   rawTotalH = n × rawItemH + (n-1) × ITEM_GAP
+ *   unifScale = rawTotalH > availH ? availH / rawTotalH : 1   (ONE scale for ALL)
+ *   itemW = rawItemW × unifScale
+ *   itemH = rawItemH × unifScale
+ *
+ * No per-item scaling. Every image gets the same width and height box.
  */
 function StackedOutfitPreview({
   items,
@@ -71,19 +133,21 @@ function StackedOutfitPreview({
 
   const { w: cardW, h: cardH } = cardDims;
 
-  // Compute positions once card has been measured.
   const positions = useMemo(() => {
     if (cardW === 0 || cardH === 0 || sorted.length === 0) return [];
 
     const availH = cardH * 0.92;
-    const rawItemW = cardW * 0.60;
+    const rawItemW = cardW * ITEM_WIDTH_FACTOR;
+    const rawItemH = rawItemW * ITEM_ASPECT;
     const n = sorted.length;
-    const rawTotalH = n * rawItemW + (n - 1) * ITEM_GAP;
+    const rawTotalH = n * rawItemH + (n - 1) * ITEM_GAP;
 
-    const scale = rawTotalH > availH ? availH / rawTotalH : 1;
-    const itemW = rawItemW * scale;
-    const gap = ITEM_GAP * scale;
-    const totalH = n * itemW + (n - 1) * gap;
+    // ONE uniform scale applied equally to all items and gaps.
+    const unifScale = rawTotalH > availH ? availH / rawTotalH : 1;
+    const itemW = rawItemW * unifScale;
+    const itemH = rawItemH * unifScale;
+    const gap   = ITEM_GAP  * unifScale;
+    const totalH = n * itemH + (n - 1) * gap;
 
     const startX = (cardW - itemW) / 2;
     const startY = (cardH - totalH) / 2;
@@ -91,8 +155,9 @@ function StackedOutfitPreview({
     return sorted.map((item, idx) => ({
       item,
       left: startX,
-      top: startY + idx * (itemW + gap),
-      size: itemW,
+      top:  startY + idx * (itemH + gap),
+      itemW,
+      itemH,
     }));
   }, [sorted, cardW, cardH]);
 
@@ -113,7 +178,10 @@ function StackedOutfitPreview({
           })
         }
       >
-        {positions.map(({ item, left, top, size }) => {
+        {/* Grid background (Fix 2) */}
+        <GridBackground width={cardW} height={cardH} />
+
+        {positions.map(({ item, left, top, itemW, itemH }) => {
           const uri =
             item.processedImageUri && item.processedImageUri.length > 0
               ? item.processedImageUri
@@ -126,8 +194,8 @@ function StackedOutfitPreview({
                 position: "absolute",
                 left,
                 top,
-                width: size,
-                height: size,
+                width: itemW,
+                height: itemH,
               }}
               contentFit="contain"
             />
