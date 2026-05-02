@@ -27,7 +27,7 @@ function displayUri(item: ClothingItem): string {
 // off-white (#FAF7F0) base. Lines are purely cosmetic absolute Views; they
 // sit beneath the card grid via zIndex ordering.
 
-const LINE_COLOR = "#EAEAEA";
+const LINE_COLOR = "#D3D3D3";
 const LINE_SPACING = 28; // px between grid lines
 const LINE_WIDTH = StyleSheet.hairlineWidth;
 
@@ -196,6 +196,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
   },
 
   cardEmpty: {
