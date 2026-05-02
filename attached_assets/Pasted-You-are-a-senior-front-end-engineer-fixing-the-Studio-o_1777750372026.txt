@@ -1,0 +1,84 @@
+You are a senior front-end engineer fixing the Studio outfit preview
+layout in the Wearwise app.
+
+CURRENT ISSUE:
+Studio-created outfits appear de-arranged in the Outfits list preview.
+Items are pushed to corners or stacked incorrectly.
+
+CAUSE:
+Preview is reusing raw canvas x/y/scale values
+inside a much smaller preview container.
+
+GOAL:
+Make Studio outfit previews look centered, balanced,
+and visually similar to the designed look,
+like the reference image provided.
+
+IMPORTANT:
+- Do NOT change Studio canvas behavior
+- Do NOT change how drag/scale works
+- This is a PREVIEW FIX ONLY
+
+------------------------------------------------------------
+1. INTRODUCE PREVIEW NORMALIZATION (CRITICAL)
+
+For outfit previews ONLY (Outfits tab):
+
+- Compute a bounding box of all items using their x/y/scale
+- Find the visual center of the outfit
+- Normalize positions so:
+  - Outfit is centered inside the preview square
+  - Relative spacing is preserved
+  - No item overflows the preview bounds
+
+This is a transform step, NOT data mutation.
+
+------------------------------------------------------------
+2. PREVIEW CONTAINER RULES
+
+- Use a square container (1:1)
+- Off-white background (#FAF7F0)
+- Optional subtle grid (lighter than Studio)
+- Padding inside the container
+
+------------------------------------------------------------
+3. PREVIEW POSITIONING LOGIC (SIMPLE)
+
+For each item:
+- Use normalizedX = item.x - outfitCenterX + previewCenterX
+- Use normalizedY = item.y - outfitCenterY + previewCenterY
+- Reduce scale slightly if needed so all items fit
+
+NO rotation.
+NO dashed borders.
+NO handles.
+
+------------------------------------------------------------
+4. VISUAL GOAL (IMPORTANT)
+
+Preview should look like:
+- A styled outfit card
+- Items centered vertically (top → middle → bottom)
+- Similar to reference image (ignore dotted square)
+
+Preview should NOT look like:
+- Raw canvas dump
+- Editor state
+
+------------------------------------------------------------
+5. KEEP EDITING BEHAVIOR UNCHANGED
+
+- Tapping preview still opens Studio with ORIGINAL layout
+- Do NOT overwrite stored x/y/scale
+- Do NOT auto-adjust Studio canvas
+
+------------------------------------------------------------
+6. GENERATED OUTFITS (NO CHANGE)
+
+- Generated outfits can keep their current simple preview
+- This change applies ONLY to Studio / lookbook outfits
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1. Updated preview render logic
+2. Normalization helper function (clean, isolated)

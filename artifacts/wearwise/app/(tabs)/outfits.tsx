@@ -28,6 +28,55 @@ type OutfitFilter = "All" | "Favorites";
 // Mini canvas snapshot for lookbook outfits
 // ---------------------------------------------------------------------------
 
+const PREVIEW_PADDING = 14; // px buffer on each side inside the square
+
+/**
+ * Normalises raw canvas coordinates so the outfit is centered and
+ * fully visible inside a preview square of `size` px.
+ *
+ * Returns { left, top, renderedSize } for each layout entry.
+ */
+function normalizeLayout(
+  layout: LookbookItem[],
+  size: number,
+): Array<{ itemId: string; left: number; top: number; renderedSize: number }> {
+  if (size === 0 || layout.length === 0) return [];
+
+  // 1. Bounding box of the composed outfit in original canvas coordinates.
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+
+  for (const e of layout) {
+    const s = ITEM_BASE * e.scale;
+    if (e.x < minX) minX = e.x;
+    if (e.y < minY) minY = e.y;
+    if (e.x + s > maxX) maxX = e.x + s;
+    if (e.y + s > maxY) maxY = e.y + s;
+  }
+
+  const contentW = Math.max(maxX - minX, 1);
+  const contentH = Math.max(maxY - minY, 1);
+
+  // 2. Scale so the largest dimension fills the available area.
+  const available = size - PREVIEW_PADDING * 2;
+  const scaleFactor = available / Math.max(contentW, contentH);
+
+  // 3. Center the scaled content inside the square.
+  const scaledW = contentW * scaleFactor;
+  const scaledH = contentH * scaleFactor;
+  const offsetX = (size - scaledW) / 2;
+  const offsetY = (size - scaledH) / 2;
+
+  return layout.map((e) => ({
+    itemId: e.itemId,
+    left: (e.x - minX) * scaleFactor + offsetX,
+    top: (e.y - minY) * scaleFactor + offsetY,
+    renderedSize: ITEM_BASE * e.scale * scaleFactor,
+  }));
+}
+
 function LookbookPreview({
   layout,
   allItems,
@@ -37,25 +86,12 @@ function LookbookPreview({
   allItems: ClothingItem[];
   onPress?: () => void;
 }) {
-  const PREVIEW_SIZE = 220;
+  const [containerSize, setContainerSize] = useState(0);
 
-  // Compute bounding box of all placed items
-  let minX = Infinity,
-    minY = Infinity,
-    maxX = -Infinity,
-    maxY = -Infinity;
-
-  for (const entry of layout) {
-    const size = ITEM_BASE * entry.scale;
-    if (entry.x < minX) minX = entry.x;
-    if (entry.y < minY) minY = entry.y;
-    if (entry.x + size > maxX) maxX = entry.x + size;
-    if (entry.y + size > maxY) maxY = entry.y + size;
-  }
-
-  const contentW = Math.max(maxX - minX, ITEM_BASE);
-  const contentH = Math.max(maxY - minY, ITEM_BASE);
-  const scaleFactor = PREVIEW_SIZE / Math.max(contentW, contentH);
+  const normalized = useMemo(
+    () => normalizeLayout(layout, containerSize),
+    [layout, containerSize],
+  );
 
   return (
     <Pressable
@@ -65,36 +101,35 @@ function LookbookPreview({
         { opacity: pressed ? 0.88 : 1 },
       ]}
     >
-      {/* Off-white canvas background */}
-      <View style={styles.lookbookCanvas}>
-        {/* Subtle grid lines */}
-        <CanvasGridLines size={PREVIEW_SIZE} />
+      <View
+        style={styles.lookbookCanvas}
+        onLayout={(e) => setContainerSize(e.nativeEvent.layout.width)}
+      >
+        <CanvasGridLines size={containerSize} />
 
-        {layout.map((entry, idx) => {
-          const item = allItems.find((i) => i.id === entry.itemId);
-          if (!item) return null;
-          const uri =
-            item.processedImageUri && item.processedImageUri.length > 0
-              ? item.processedImageUri
-              : item.imageUri;
-          const size = ITEM_BASE * entry.scale * scaleFactor;
-          const left = (entry.x - minX) * scaleFactor;
-          const top = (entry.y - minY) * scaleFactor;
-          return (
-            <Image
-              key={`${entry.itemId}-${idx}`}
-              source={{ uri }}
-              style={{
-                position: "absolute",
-                left,
-                top,
-                width: size,
-                height: size,
-              }}
-              contentFit="contain"
-            />
-          );
-        })}
+        {containerSize > 0 &&
+          normalized.map((n, idx) => {
+            const item = allItems.find((i) => i.id === n.itemId);
+            if (!item) return null;
+            const uri =
+              item.processedImageUri && item.processedImageUri.length > 0
+                ? item.processedImageUri
+                : item.imageUri;
+            return (
+              <Image
+                key={`${n.itemId}-${idx}`}
+                source={{ uri }}
+                style={{
+                  position: "absolute",
+                  left: n.left,
+                  top: n.top,
+                  width: n.renderedSize,
+                  height: n.renderedSize,
+                }}
+                contentFit="contain"
+              />
+            );
+          })}
       </View>
     </Pressable>
   );
