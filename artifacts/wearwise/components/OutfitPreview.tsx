@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
@@ -21,12 +21,64 @@ function displayUri(item: ClothingItem): string {
 }
 
 // ---------------------------------------------------------------------------
+// Decorative grid-line background
+// ---------------------------------------------------------------------------
+// Renders evenly-spaced horizontal + vertical hairlines over the warm
+// off-white (#FAF7F0) base. Lines are purely cosmetic absolute Views; they
+// sit beneath the card grid via zIndex ordering.
+
+const LINE_COLOR = "#EAEAEA";
+const LINE_SPACING = 28; // px between grid lines
+const LINE_WIDTH = StyleSheet.hairlineWidth;
+
+function GridBackground({ width, height }: { width: number; height: number }) {
+  if (width === 0 || height === 0) return null;
+
+  const hLines: number[] = [];
+  for (let y = LINE_SPACING; y < height; y += LINE_SPACING) hLines.push(y);
+
+  const vLines: number[] = [];
+  for (let x = LINE_SPACING; x < width; x += LINE_SPACING) vLines.push(x);
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {hLines.map((y) => (
+        <View
+          key={`h${y}`}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: y,
+            height: LINE_WIDTH,
+            backgroundColor: LINE_COLOR,
+          }}
+        />
+      ))}
+      {vLines.map((x) => (
+        <View
+          key={`v${x}`}
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: x,
+            width: LINE_WIDTH,
+            backgroundColor: LINE_COLOR,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Single clothing card
 // ---------------------------------------------------------------------------
 
-function ItemCard({ item, label }: { item: ClothingItem | null | undefined; label?: string }) {
+function ItemCard({ item }: { item: ClothingItem | null | undefined }) {
   if (!item) {
-    // Empty placeholder — preserves grid structure without shifting siblings
+    // Invisible placeholder — holds its slot so the grid never shifts
     return <View style={styles.cardEmpty} />;
   }
   return (
@@ -37,11 +89,6 @@ function ItemCard({ item, label }: { item: ClothingItem | null | undefined; labe
         contentFit="contain"
         transition={150}
       />
-      {label ? (
-        <Text style={styles.cardLabel} numberOfLines={1}>
-          {label}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -50,29 +97,21 @@ function ItemCard({ item, label }: { item: ClothingItem | null | undefined; labe
 // Grid layout
 // ---------------------------------------------------------------------------
 //
-// The 2 × 2 grid follows three deterministic cases:
-//
-//   Case 1 — Normal (top + bottom + shoes, no outerwear):
-//     top-left  = Top      top-right  = Shoes
-//     bot-left  = Bottom   bot-right  = [empty]
+//   Case 1 — Standard (top + bottom + shoes, no outerwear):
+//     top-left  = Top        top-right  = Shoes
+//     bot-left  = Bottom     bot-right  = [empty]
 //
 //   Case 2 — With outerwear:
-//     top-left  = Top      top-right  = Outerwear
-//     bot-left  = Bottom   bot-right  = Shoes
+//     top-left  = Top        top-right  = Outerwear
+//     bot-left  = Bottom     bot-right  = Shoes
 //
 //   Case 3 — Dress (top but no bottom):
-//     top-left  = Top      top-right  = Shoes
-//     bot-left  = [empty]  bot-right  = [empty]
-//
-// Slots that are null render as empty squares — they hold space without
-// collapsing the column so the layout never shifts.
-
-// ---------------------------------------------------------------------------
-// Main export
-// ---------------------------------------------------------------------------
+//     top-left  = Top/Dress  top-right  = Shoes
+//     bot-left  = [empty]    bot-right  = [empty]
 
 export function OutfitPreview({ outfit }: Props) {
   const colors = useColors();
+  const [dims, setDims] = useState({ width: 0, height: 0 });
 
   if (!outfit) {
     return (
@@ -90,23 +129,30 @@ export function OutfitPreview({ outfit }: Props) {
 
   const hasOuterwear = !!outfit.outerwear;
 
-  // Resolve the four grid slots
-  const topLeft   = outfit.top;
+  const topLeft    = outfit.top ?? null;
   const bottomLeft = outfit.bottom ?? null;
-  const topRight  = hasOuterwear ? outfit.outerwear : (outfit.shoes ?? null);
+  const topRight   = hasOuterwear ? (outfit.outerwear ?? null) : (outfit.shoes ?? null);
   const bottomRight = hasOuterwear ? (outfit.shoes ?? null) : null;
 
   return (
-    <View style={styles.container}>
-      {/* Subtle grid-line effect: EAEAEA background shows through the 2 px gap */}
+    <View
+      style={styles.container}
+      onLayout={(e) =>
+        setDims({
+          width: e.nativeEvent.layout.width,
+          height: e.nativeEvent.layout.height,
+        })
+      }
+    >
+      {/* Decorative grid lines drawn on the warm off-white base */}
+      <GridBackground width={dims.width} height={dims.height} />
+
+      {/* 2 × 2 card grid — sits above the background lines */}
       <View style={styles.grid}>
-        {/* Left column */}
         <View style={styles.column}>
           <ItemCard item={topLeft} />
           <ItemCard item={bottomLeft} />
         </View>
-
-        {/* Right column */}
         <View style={styles.column}>
           <ItemCard item={topRight} />
           <ItemCard item={bottomRight} />
@@ -120,35 +166,31 @@ export function OutfitPreview({ outfit }: Props) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const CARD_BORDER_RADIUS = 16;
-const GRID_GAP = 2;   // gap between cells — EAEAEA background peeks through
+const CARD_RADIUS = 18;
+const CELL_GAP = 10;
 
 const styles = StyleSheet.create({
-  // Outer container: white background, rounded, padded
   container: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FAF7F0",
     borderRadius: 20,
     padding: 20,
+    overflow: "hidden",
   },
 
-  // Inner wrapper carries the EAEAEA grid-line colour and renders the gaps
   grid: {
-    backgroundColor: "#EAEAEA",
-    borderRadius: CARD_BORDER_RADIUS + 2,
     flexDirection: "row",
-    gap: GRID_GAP,
-    overflow: "hidden",
+    gap: CELL_GAP,
+    zIndex: 1,
   },
 
   column: {
     flex: 1,
-    gap: GRID_GAP,
+    gap: CELL_GAP,
   },
 
-  // Occupied card
   card: {
     backgroundColor: "#F1F1F1",
-    borderRadius: CARD_BORDER_RADIUS,
+    borderRadius: CARD_RADIUS,
     aspectRatio: 1,
     padding: 10,
     alignItems: "center",
@@ -156,12 +198,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  // Empty placeholder — same dimensions as a card, invisible
   cardEmpty: {
-    backgroundColor: "#F1F1F1",
-    borderRadius: CARD_BORDER_RADIUS,
+    backgroundColor: "transparent",
+    borderRadius: CARD_RADIUS,
     aspectRatio: 1,
-    opacity: 0,
   },
 
   cardImage: {
@@ -169,18 +209,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
-  cardLabel: {
-    position: "absolute",
-    bottom: 6,
-    left: 6,
-    right: 6,
-    fontSize: 9,
-    fontFamily: "Inter_500Medium",
-    color: "#6B6B6B",
-    textAlign: "center",
-  },
-
-  // Empty-state card (no outfit generated yet)
+  // Empty state (no outfit generated yet)
   empty: {
     borderRadius: 20,
     paddingVertical: 48,

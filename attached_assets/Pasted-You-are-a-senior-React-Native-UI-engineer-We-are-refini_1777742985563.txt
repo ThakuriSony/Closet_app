@@ -1,0 +1,150 @@
+You are a senior React Native UI engineer.
+
+We are refining ONLY the Outfit Generator section on the Home tab in the Wearwise app.
+
+IMPORTANT:
+- DO NOT modify closet logic
+- DO NOT modify image upload or processing
+- DO NOT break any existing functionality
+- Only update the UI layout for the outfit generator
+
+---
+
+GOAL:
+
+Match the following design EXACTLY:
+
+- Section background: warm off-white (#FAF7F0)
+- Subtle grid lines in background
+- Clothing items displayed in square cards
+- Card background: #F1F1F1
+- Clean 2x2 structured layout
+
+---
+
+1. MAIN CONTAINER
+
+- Background color: #FAF7F0
+- Add subtle grid pattern:
+  - thin lines (#EAEAEA)
+  - evenly spaced (like design reference)
+- Padding: 20
+- Border radius: 20
+
+---
+
+2. GRID LAYOUT (STRICT)
+
+Use a 2-column layout:
+
+LEFT COLUMN:
+- Top (or Dress)
+- Bottom (if exists)
+
+RIGHT COLUMN:
+- Outerwear (if exists, top-right)
+- Shoes (always on right)
+
+---
+
+3. POSITION RULES (VERY IMPORTANT)
+
+CASE 1 — Standard outfit:
+Top → top-left  
+Bottom → bottom-left  
+Shoes → top-right  
+
+---
+
+CASE 2 — With outerwear:
+Top → top-left  
+Bottom → bottom-left  
+Outerwear → top-right  
+Shoes → directly below outerwear  
+
+---
+
+CASE 3 — Dress:
+Dress → top-left  
+(no bottom)  
+Shoes → top-right  
+
+---
+
+4. ITEM CARDS
+
+Each clothing item must:
+
+- Be a perfect square
+- Background: #F1F1F1
+- Border radius: 16–20
+- Padding inside: 10–12
+
+Image inside:
+- resizeMode: "contain"
+- Centered
+- Maintain aspect ratio
+
+---
+
+5. SPACING
+
+- Equal spacing between cards
+- Consistent vertical rhythm
+- Do NOT stretch items
+- Do NOT overlap items
+
+---
+
+6. IMAGE SOURCE
+
+Always use:
+
+processedImageUri || imageUri
+
+---
+
+7. EMPTY STATES
+
+If an item is missing:
+- Leave that grid space empty
+- DO NOT shift other items
+
+---
+
+8. DO NOT DO
+
+- DO NOT use absolute positioning
+- DO NOT stack items vertically
+- DO NOT use AI-generated layout
+- DO NOT dynamically rearrange items
+- DO NOT modify other screens
+
+---
+
+9. FILES TO UPDATE
+
+- HomeScreen.tsx
+- OutfitGenerator component
+
+---
+
+OUTPUT:
+
+1. Updated layout implementation
+2. Grid-based structure
+3. Styled container with background pattern
+4. Clean, consistent UI
+
+---
+
+DESIGN GOAL:
+
+The result must look like:
+- Editorial outfit grid
+- Clean, minimal, premium
+- Exactly like provided reference
+
+---
+
+Start implementing now.
