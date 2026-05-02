@@ -17,11 +17,131 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/EmptyState";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
-import type { Outfit } from "@/types";
+import type { ClothingItem, LookbookItem, Outfit } from "@/types";
 
 const H_PADDING = 20;
+const ITEM_BASE = 140; // matches CANVAS_ITEM_SIZE in CanvasItem.tsx
 
 type OutfitFilter = "All" | "Favorites";
+
+// ---------------------------------------------------------------------------
+// Mini canvas snapshot for lookbook outfits
+// ---------------------------------------------------------------------------
+
+function LookbookPreview({
+  layout,
+  allItems,
+  onPress,
+}: {
+  layout: LookbookItem[];
+  allItems: ClothingItem[];
+  onPress?: () => void;
+}) {
+  const PREVIEW_SIZE = 220;
+
+  // Compute bounding box of all placed items
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+
+  for (const entry of layout) {
+    const size = ITEM_BASE * entry.scale;
+    if (entry.x < minX) minX = entry.x;
+    if (entry.y < minY) minY = entry.y;
+    if (entry.x + size > maxX) maxX = entry.x + size;
+    if (entry.y + size > maxY) maxY = entry.y + size;
+  }
+
+  const contentW = Math.max(maxX - minX, ITEM_BASE);
+  const contentH = Math.max(maxY - minY, ITEM_BASE);
+  const scaleFactor = PREVIEW_SIZE / Math.max(contentW, contentH);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.lookbookContainer,
+        { opacity: pressed ? 0.88 : 1 },
+      ]}
+    >
+      {/* Off-white canvas background */}
+      <View style={styles.lookbookCanvas}>
+        {/* Subtle grid lines */}
+        <CanvasGridLines size={PREVIEW_SIZE} />
+
+        {layout.map((entry, idx) => {
+          const item = allItems.find((i) => i.id === entry.itemId);
+          if (!item) return null;
+          const uri =
+            item.processedImageUri && item.processedImageUri.length > 0
+              ? item.processedImageUri
+              : item.imageUri;
+          const size = ITEM_BASE * entry.scale * scaleFactor;
+          const left = (entry.x - minX) * scaleFactor;
+          const top = (entry.y - minY) * scaleFactor;
+          return (
+            <Image
+              key={`${entry.itemId}-${idx}`}
+              source={{ uri }}
+              style={{
+                position: "absolute",
+                left,
+                top,
+                width: size,
+                height: size,
+              }}
+              contentFit="contain"
+            />
+          );
+        })}
+      </View>
+    </Pressable>
+  );
+}
+
+function CanvasGridLines({ size }: { size: number }) {
+  const SPACING = 22;
+  const LINE_W = StyleSheet.hairlineWidth;
+  const COLOR = "rgba(0,0,0,0.07)";
+
+  const lines: React.ReactNode[] = [];
+  for (let y = SPACING; y < size; y += SPACING) {
+    lines.push(
+      <View
+        key={`h${y}`}
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: y,
+          height: LINE_W,
+          backgroundColor: COLOR,
+        }}
+      />,
+    );
+  }
+  for (let x = SPACING; x < size; x += SPACING) {
+    lines.push(
+      <View
+        key={`v${x}`}
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: x,
+          width: LINE_W,
+          backgroundColor: COLOR,
+        }}
+      />,
+    );
+  }
+  return <>{lines}</>;
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
 
 export default function OutfitsScreen() {
   const colors = useColors();
@@ -95,7 +215,6 @@ export default function OutfitsScreen() {
           </Text>
         </View>
 
-        {/* Studio "Create Look" button */}
         <Pressable
           onPress={onCreateStudio}
           style={({ pressed }) => [
@@ -144,9 +263,14 @@ export default function OutfitsScreen() {
           }}
           renderItem={({ item }) => {
             const isLookbook = item.type === "lookbook";
+            const hasLayout =
+              isLookbook && Array.isArray(item.layout) && item.layout.length > 0;
+
+            // Items for generated outfit preview row
             const outfitItems = item.itemIds
               .map((id) => items.find((i) => i.id === id))
               .filter((v): v is NonNullable<typeof v> => Boolean(v));
+
             return (
               <View
                 style={[
@@ -157,23 +281,34 @@ export default function OutfitsScreen() {
                   },
                 ]}
               >
-                <View style={styles.previewRow}>
-                  {outfitItems.slice(0, 4).map((it) => (
-                    <View
-                      key={it.id}
-                      style={[
-                        styles.preview,
-                        { backgroundColor: colors.secondary },
-                      ]}
-                    >
-                      <Image
-                        source={{ uri: it.imageUri }}
-                        style={styles.previewImg}
-                        contentFit="cover"
-                      />
-                    </View>
-                  ))}
-                </View>
+                {/* Preview area */}
+                {hasLayout ? (
+                  <LookbookPreview
+                    layout={item.layout!}
+                    allItems={items}
+                    onPress={() => onEditLookbook(item)}
+                  />
+                ) : (
+                  <View style={styles.previewRow}>
+                    {outfitItems.slice(0, 4).map((it) => (
+                      <View
+                        key={it.id}
+                        style={[
+                          styles.preview,
+                          { backgroundColor: colors.secondary },
+                        ]}
+                      >
+                        <Image
+                          source={{ uri: it.imageUri }}
+                          style={styles.previewImg}
+                          contentFit="cover"
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Footer */}
                 <View style={styles.cardFooter}>
                   <View style={styles.cardLeft}>
                     {isLookbook && (
@@ -266,6 +401,10 @@ export default function OutfitsScreen() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Filter chips
+// ---------------------------------------------------------------------------
+
 function OutfitFilterChips({
   value,
   onChange,
@@ -316,6 +455,10 @@ function OutfitFilterChips({
     </View>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -368,11 +511,15 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   emptyWrap: { flex: 1 },
+
+  // Card
   card: {
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 12,
   },
+
+  // Generated outfit preview row
   previewRow: {
     flexDirection: "row",
     gap: 10,
@@ -387,6 +534,21 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+
+  // Lookbook mini-canvas
+  lookbookContainer: {
+    width: "100%",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  lookbookCanvas: {
+    width: "100%",
+    aspectRatio: 1,
+    backgroundColor: "#FAF7F0",
+    overflow: "hidden",
+  },
+
+  // Card footer
   cardFooter: {
     marginTop: 12,
     flexDirection: "row",

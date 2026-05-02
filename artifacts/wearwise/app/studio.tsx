@@ -320,18 +320,13 @@ export default function StudioScreen() {
           );
         })}
 
-        {/* Empty state hint */}
+        {/* Subtle bottom hint — only shown when canvas is empty */}
         {canvasEntries.length === 0 && (
           <View style={styles.hint} pointerEvents="none">
-            <Feather
-              name="plus-circle"
-              size={36}
-              color="rgba(0,0,0,0.15)"
-            />
             <Text style={styles.hintText}>
               {emptyCloset
                 ? "Add items to your Closet first"
-                : "Tap + to add clothing items"}
+                : ""}
             </Text>
           </View>
         )}

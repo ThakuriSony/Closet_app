@@ -1,0 +1,110 @@
+You are a senior product-focused front-end engineer fixing UX issues
+in the Wearwise app.
+
+CURRENT ISSUES:
+1. In Studio (canvas view), the text “Tap + to add clothing items”
+   is misleading and visually noisy.
+2. In the Outfits tab, saved Studio outfits do NOT reflect
+   the designed canvas layout. The preview looks flat and incorrect.
+
+GOAL:
+Improve clarity and make Studio-created outfits feel intentional,
+designed, and recognizable at a glance.
+
+IMPORTANT:
+- Do NOT change canvas logic (drag, scale, layout are correct)
+- Do NOT change data model
+- This is a UX + preview representation fix
+
+------------------------------------------------------------
+1) FIX STUDIO EMPTY STATE (VERY IMPORTANT)
+
+CURRENT:
+- Center text: “Tap + to add clothing items”
+
+PROBLEM:
+- Suggests tapping the canvas
+- Conflicts with the floating + button
+- Feels instructional instead of editorial
+
+FIX:
+- REMOVE the center text entirely
+- Keep the canvas clean and empty
+- Rely ONLY on the floating + button (bottom-right) as the affordance
+
+Optional (only if needed):
+- Replace with small, subtle helper text near bottom:
+  “Add items to start styling”
+- Must be low-emphasis (light gray, small font)
+
+DO NOT:
+- Put text in the middle of the canvas
+- Add arrows or tutorials
+
+------------------------------------------------------------
+2) FIX OUTFITS TAB PREVIEW FOR STUDIO OUTFITS
+
+CURRENT:
+- Outfits tab shows Studio outfits as a simple horizontal row of items
+- This does NOT represent the designed look
+
+DESIRED BEHAVIOR:
+Studio outfits should preview as a **mini canvas snapshot**.
+
+IMPLEMENTATION:
+
+A. Detect outfit type:
+- If outfit.type === "lookbook" (or Studio-created)
+
+B. Preview layout:
+- Use a square container (1:1 ratio)
+- Off-white background (#FAF7F0)
+- Optional subtle grid (same as Studio canvas, lighter)
+
+C. Render items INSIDE the square using saved layout data:
+- Use each item’s:
+  - x
+  - y
+  - scale
+- Render smaller thumbnail versions of the clothes
+- Preserve relative positioning (top, bottom, overlap)
+
+This preview should look like a small version of the canvas,
+NOT a product list.
+
+------------------------------------------------------------
+3) KEEP GENERATED OUTFITS AS-IS
+
+- Generated outfits (AI / rule-based) can keep the simple row preview
+- Only Studio / Lookbook outfits use the canvas-style preview
+
+------------------------------------------------------------
+4) TAP BEHAVIOR (IMPORTANT)
+
+- Tapping a Studio preview:
+  → Opens Studio editor with the saved layout
+- Tapping a generated outfit:
+  → Opens standard outfit detail (existing behavior)
+
+------------------------------------------------------------
+5) UI LABELING (SMALL BUT IMPORTANT)
+
+In the Outfits list:
+- Add a small “Studio” pill/badge for Studio-created outfits
+- Helps users distinguish:
+  - Designed looks vs Generated outfits
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1. Updated Studio empty state
+2. Updated Outfits list preview logic
+3. Square canvas-style preview for lookbook outfits
+4. No logic regressions
+
+CONSTRAINTS:
+- Do NOT redesign screens
+- Do NOT add new flows
+- Do NOT add heavy rendering logic
+- Keep previews lightweight and performant
+
+Start fixing now.
