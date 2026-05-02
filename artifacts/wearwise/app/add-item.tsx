@@ -21,7 +21,6 @@ import { CategoryPicker } from "@/components/CategoryPicker";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
 import { analyzeClothingImage } from "@/services/aiTagging";
-import { ensureProcessedImage } from "@/services/backgroundRemoval";
 import type { Category } from "@/types";
 
 type AiState =
@@ -52,7 +51,7 @@ function clampAspectRatio(width: number, height: number): number {
 export default function AddItemScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { addItem, setItemProcessedImage } = useWardrobe();
+  const { addItem } = useWardrobe();
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageAspect, setImageAspect] = useState<number>(3 / 4);
@@ -181,7 +180,7 @@ export default function AddItemScreen() {
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean);
-      const saved = await addItem({
+      await addItem({
         imageUri,
         category,
         color: color.trim(),
@@ -190,25 +189,6 @@ export default function AddItemScreen() {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      // Background-removal runs after the item is saved so the user is never
-      // blocked by the network call. If it fails, the original image stays.
-      const sourceBase64 = lastAsset?.base64;
-      const sourceMime = lastAsset?.mimeType;
-      void ensureProcessedImage(imageUri, {
-        sourceBase64,
-        mimeType: sourceMime,
-      })
-        .then((processedUri) => {
-          if (processedUri) {
-            console.log("[BgRemoval] processed PNG ready:", processedUri.slice(0, 80));
-            void setItemProcessedImage(saved.id, processedUri);
-          } else {
-            console.log("[BgRemoval] returned null — keeping original image");
-          }
-        })
-        .catch((err) => {
-          console.log("[BgRemoval] pipeline error:", err);
-        });
       router.back();
     } catch (e) {
       Alert.alert("Could not save", "Something went wrong. Please try again.");

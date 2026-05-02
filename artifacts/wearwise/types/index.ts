@@ -13,9 +13,6 @@ export type ItemStatus = "clean" | "dirty";
 export interface ClothingItem {
   id: string;
   imageUri: string;
-  // Local file URI of a background-removed PNG. Falls back to imageUri when
-  // unavailable (e.g. removal failed or hasn't completed yet).
-  processedImageUri?: string | null;
   category: Category;
   color: string;
   tags: string[];

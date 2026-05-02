@@ -22,10 +22,6 @@ function normalizeItem(raw: Partial<ClothingItem> & { id: string }): ClothingIte
   return {
     id: raw.id,
     imageUri: raw.imageUri ?? "",
-    processedImageUri:
-      typeof raw.processedImageUri === "string" && raw.processedImageUri
-        ? raw.processedImageUri
-        : null,
     category: (raw.category ?? "Top") as Category,
     color: raw.color ?? "",
     tags: raw.tags ?? [],
@@ -56,7 +52,6 @@ interface WardrobeContextValue {
     color: string;
     tags: string[];
   }) => Promise<ClothingItem>;
-  setItemProcessedImage: (id: string, uri: string | null) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   getItem: (id: string) => ClothingItem | undefined;
   addOutfit: (itemIds: string[]) => Promise<Outfit>;
@@ -119,7 +114,6 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       const item: ClothingItem = {
         id: genId(),
         imageUri: input.imageUri,
-        processedImageUri: null,
         category: input.category,
         color: input.color,
         tags: input.tags,
@@ -132,18 +126,6 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       const next = [item, ...items];
       await persistItems(next);
       return item;
-    },
-    [items, persistItems],
-  );
-
-  const setItemProcessedImage = useCallback<
-    WardrobeContextValue["setItemProcessedImage"]
-  >(
-    async (id, uri) => {
-      const next = items.map((it) =>
-        it.id === id ? { ...it, processedImageUri: uri } : it,
-      );
-      await persistItems(next);
     },
     [items, persistItems],
   );
@@ -246,7 +228,6 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       outfits,
       loading,
       addItem,
-      setItemProcessedImage,
       removeItem,
       getItem,
       addOutfit,
@@ -261,7 +242,6 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       outfits,
       loading,
       addItem,
-      setItemProcessedImage,
       removeItem,
       getItem,
       addOutfit,
