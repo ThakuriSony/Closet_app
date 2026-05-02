@@ -1,0 +1,150 @@
+You are a senior full-stack engineer. We are extending the existing outfit generator
+in the Wearwise app.
+
+CURRENT STATE:
+- Outfit generation logic is rule-based and structurally valid
+- Invalid combinations (e.g. dress + pants) are already prevented
+- Home screen has an outfit generator section
+- A single outfit is currently generated
+
+GOAL:
+Improve the outfit generator to return **3 different valid outfit options**
+so users can choose what to wear.
+
+IMPORTANT:
+- Do NOT break existing outfit validity rules
+- Do NOT rely on AI to assemble outfits
+- AI may only explain outfits, not generate structure
+- Keep UI clean and minimal
+
+---
+
+## 1. UPDATE OUTFIT GENERATION LOGIC
+
+Modify the existing function:
+
+generateOutfit()
+
+→ to a new function:
+
+generateOutfitOptions()
+
+### Function signature example:
+generateOutfitOptions(
+  clothingItems,
+  occasion,
+  weather,
+  eventCategory
+): Outfit[]
+
+### Requirements:
+- Generate **exactly 3 outfits** if possible
+- Each outfit must:
+  - Follow outfit structure rules (Dress-based OR Top/Bottom-based)
+  - Be structurally valid
+  - Be different from the others (avoid same core pieces when possible)
+
+### Strategy:
+1. Reuse the SAME rules and scoring system
+2. Generate outfits by:
+   - Trying different valid outfit templates
+   - Rotating high-scoring items
+3. If closet is small:
+   - Allow partial overlap
+   - Still return best-possible 3 options
+4. NEVER return invalid outfits
+
+---
+
+## 2. OUTFIT DIFFERENTIATION (IMPORTANT)
+
+Ensure the 3 options feel meaningfully different:
+- Prefer different tops or dresses across options
+- Secondary pieces (shoes, jacket) can overlap if closet is limited
+
+Each outfit should include:
+- items[]
+- occasion
+- optional explanation (from AI, later)
+
+---
+
+## 3. AI USAGE (KEEP LIMITED)
+
+AFTER outfits are generated, AI may be used ONLY to explain.
+
+For each outfit, send metadata to AI with prompt:
+
+"Explain why this outfit works for a {occasion} occasion in under 2 sentences.
+Do not suggest changes. No emojis."
+
+AI must NOT:
+- Pick items
+- Suggest combinations
+- Override logic
+
+---
+
+## 4. UI — DISPLAY AS CAROUSEL (CRITICAL)
+
+Update Home outfit generator UI:
+
+### Layout:
+- Replace single outfit preview with **horizontal carousel**
+- Each card = one outfit option
+- Swipe horizontally to view options
+
+### Each outfit card shows:
+- Outfit images (Top/Bottom/Dress/Shoes)
+- Small label: “Option 1”, “Option 2”, “Option 3”
+- (Optional) Short AI explanation text
+
+### Interaction:
+- Button: “Wear This Outfit”
+- Button: “Save Outfit”
+- Track which option user selects
+
+---
+
+## 5. STATE MANAGEMENT
+
+Store:
+- selectedOutfitIndex
+- selectedOutfit
+
+Generate outfits:
+- On “Generate Outfit” tap
+- When occasion OR event changes
+
+Do NOT regenerate automatically while swiping.
+
+---
+
+## 6. EDGE CASES
+
+- If fewer than 3 outfits possible:
+  → show as many as possible
+- If closet too small:
+  → show message: “Add more items for better options”
+- Never fail silently
+
+---
+
+## 7. OUTPUT REQUIREMENTS
+
+1. Updated outfitEngine logic
+2. Validation to ensure all outfits are valid
+3. Updated Home screen UI with horizontal carousel
+4. Minimal styles (no heavy animation libs)
+5. Testing steps
+
+---
+
+## CONSTRAINTS
+
+- DO NOT reintroduce AI-driven outfit construction
+- DO NOT allow invalid combinations
+- DO NOT overdesign the UI
+- Keep everything deterministic and readable
+
+Start implementing now.

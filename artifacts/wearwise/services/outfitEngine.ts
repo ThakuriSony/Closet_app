@@ -403,3 +403,160 @@ export function generateOutfit(
 
   return candidate;
 }
+
+// ---------------------------------------------------------------------------
+// generateOutfitOptions — returns up to maxCount structurally valid outfits
+// ---------------------------------------------------------------------------
+// Differentiation strategy:
+//   Phase 1 — rotate through the top-ranked tops (primary differentiator).
+//   Phase 2 — if fewer than maxCount, vary shoes while keeping the best top.
+// All outfits pass isValidOutfit() before being included.
+
+function rankItems(
+  items: ClothingItem[],
+  category: Category,
+  occasion: Occasion,
+  weather: WeatherBucket,
+  freq: Map<string, number>,
+  filter?: (i: ClothingItem) => boolean,
+): ClothingItem[] {
+  return items
+    .filter((i) => i.category === category && (!filter || filter(i)))
+    .sort(
+      (a, b) =>
+        scoreItem(b, occasion, weather, freq, true) -
+        scoreItem(a, occasion, weather, freq, true),
+    );
+}
+
+function bestAvailable(
+  ranked: ClothingItem[],
+  exclude: Set<string> = new Set(),
+): ClothingItem | undefined {
+  return (
+    ranked.find((i) => i.status !== "dirty" && !exclude.has(i.id)) ??
+    ranked.find((i) => !exclude.has(i.id))
+  );
+}
+
+export function generateOutfitOptions(
+  items: ClothingItem[],
+  occasion: Occasion,
+  weather: WeatherInfo,
+  eventCategory?: EventCategory,
+  maxCount = 3,
+): GenerateOutfitResult[] {
+  const effectiveOccasion: Occasion = eventCategory
+    ? occasionForEvent(eventCategory)
+    : occasion;
+
+  const freq = buildTagFrequency(items);
+  const bodyBucket: WeatherBucket = bucketForTemp(weather.maxTemp);
+  const outerBucket: WeatherBucket = bucketForOuterwear(
+    weather.minTemp,
+    weather.maxTemp,
+  );
+  const rule = outerwearRule(weather.minTemp, weather.maxTemp, weather.tempRange);
+  const template = selectTemplate(items, effectiveOccasion);
+  const accessories = pickTopAccessories(items, effectiveOccasion, bodyBucket, freq, 3);
+
+  const topFilter =
+    template === "DRESS_SHOES" ? isDress : (i: ClothingItem) => !isDress(i);
+
+  const rankedTops = rankItems(items, "Top", effectiveOccasion, bodyBucket, freq, topFilter);
+  const rankedBottoms =
+    template === "TOP_BOTTOM_SHOES"
+      ? rankItems(items, "Bottom", effectiveOccasion, bodyBucket, freq)
+      : [];
+  const rankedShoes = rankItems(items, "Shoes", effectiveOccasion, bodyBucket, freq);
+  const rankedOuterwear =
+    rule !== "omit"
+      ? rankItems(items, "Outerwear", effectiveOccasion, outerBucket, freq)
+      : [];
+
+  function buildCandidate(
+    top: ClothingItem,
+    shoesExclude: Set<string> = new Set(),
+  ): GenerateOutfitResult | null {
+    const bottom =
+      template === "TOP_BOTTOM_SHOES" ? bestAvailable(rankedBottoms) : undefined;
+    const shoes = bestAvailable(rankedShoes, shoesExclude);
+    const outerwear = rule !== "omit" ? bestAvailable(rankedOuterwear) : undefined;
+
+    const missing: Category[] = [];
+    if (template === "TOP_BOTTOM_SHOES" && !bottom) missing.push("Bottom");
+    if (!shoes) missing.push("Shoes");
+    if (rule === "required" && !outerwear) missing.push("Outerwear");
+
+    const c: GenerateOutfitResult = {
+      top,
+      bottom,
+      shoes,
+      outerwear,
+      accessories,
+      missing,
+      usedDirty:
+        top.status === "dirty" ||
+        bottom?.status === "dirty" ||
+        shoes?.status === "dirty" ||
+        outerwear?.status === "dirty" ||
+        accessories.some((a) => a.status === "dirty"),
+    };
+    return isValidOutfit(c) ? c : null;
+  }
+
+  const results: GenerateOutfitResult[] = [];
+
+  // Phase 1 — rotate tops
+  for (const top of rankedTops) {
+    if (results.length >= maxCount) break;
+    const c = buildCandidate(top);
+    if (c) results.push(c);
+  }
+
+  // Phase 2 — vary shoes with the best top when more options are needed
+  if (results.length < maxCount && rankedTops.length > 0) {
+    const bestTop = rankedTops[0]!;
+    const usedShoes = new Set(
+      results.map((r) => r.shoes?.id).filter(Boolean) as string[],
+    );
+    for (const shoesItem of rankedShoes) {
+      if (results.length >= maxCount) break;
+      if (usedShoes.has(shoesItem.id)) continue;
+
+      const bottom =
+        template === "TOP_BOTTOM_SHOES" ? bestAvailable(rankedBottoms) : undefined;
+      const outerwear = rule !== "omit" ? bestAvailable(rankedOuterwear) : undefined;
+
+      const missing: Category[] = [];
+      if (template === "TOP_BOTTOM_SHOES" && !bottom) missing.push("Bottom");
+      if (rule === "required" && !outerwear) missing.push("Outerwear");
+
+      const c: GenerateOutfitResult = {
+        top: bestTop,
+        bottom,
+        shoes: shoesItem,
+        outerwear,
+        accessories,
+        missing,
+        usedDirty:
+          bestTop.status === "dirty" ||
+          bottom?.status === "dirty" ||
+          shoesItem.status === "dirty" ||
+          outerwear?.status === "dirty" ||
+          accessories.some((a) => a.status === "dirty"),
+      };
+      if (isValidOutfit(c)) {
+        results.push(c);
+        usedShoes.add(shoesItem.id);
+      }
+    }
+  }
+
+  // Final fallback — at minimum return the single-outfit result
+  if (results.length === 0) {
+    results.push(generateOutfit(items, occasion, weather, eventCategory));
+  }
+
+  return results;
+}

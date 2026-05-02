@@ -2,14 +2,22 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,7 +38,7 @@ import {
   type UserLocation,
 } from "@/services/locationService";
 import {
-  generateOutfit,
+  generateOutfitOptions,
   occasionForEvent,
   type GenerateOutfitResult,
   type Occasion,
@@ -48,9 +56,12 @@ import type { EventCategory, WearEvent } from "@/types";
 
 const H_PADDING = 20;
 
+const VIEWABILITY_CONFIG = { viewAreaCoveragePercentThreshold: 51 };
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const { items, addOutfit, markItemsWorn } = useWardrobe();
   const {
     name,
@@ -72,14 +83,18 @@ export default function HomeScreen() {
   const [weatherFailed, setWeatherFailed] = useState<boolean>(false);
   const [locationLabel, setLocationLabel] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState<boolean>(true);
-  const [outfit, setOutfit] = useState<GenerateOutfitResult | null>(null);
-  const [explanation, setExplanation] = useState<string>("");
+
+  // Outfit carousel state
+  const [outfits, setOutfits] = useState<GenerateOutfitResult[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [explanations, setExplanations] = useState<string[]>([]);
   const [explaining, setExplaining] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
-  const [worn, setWorn] = useState<boolean>(false);
+  const [wornIndices, setWornIndices] = useState<Set<number>>(new Set());
   const [prefsModalOpen, setPrefsModalOpen] = useState<boolean>(false);
 
-  // Show preferences setup the first time the user opens Home.
+  const carouselRef = useRef<FlatList<GenerateOutfitResult>>(null);
+
   useEffect(() => {
     if (!profileLoading && !hasDirtyThreshold) {
       setPrefsModalOpen(true);
@@ -94,11 +109,9 @@ export default function HomeScreen() {
     (async () => {
       const result = await getUserLocation();
       if (cancelled) return;
-
       const loc = result.location;
       setLocationLabel(loc?.city ?? "Your location");
       setLocationLoading(false);
-
       const target = loc ?? DEFAULT_LOCATION;
       try {
         const w = await fetchWeather(target);
@@ -115,13 +128,9 @@ export default function HomeScreen() {
         if (!cancelled) setWeatherLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  // Schedule (or clear) local notifications whenever the inputs that affect
-  // them change. The service internally dedupes by signature so this is cheap.
   useEffect(() => {
     if (weatherLoading) return;
     void rescheduleNotifications({
@@ -136,7 +145,6 @@ export default function HomeScreen() {
     return cats.has("Top") && cats.has("Bottom") && cats.has("Shoes");
   }, [items]);
 
-  // Show the next event happening within 48 hours (with reminder enabled).
   const upcomingEvent = useMemo<WearEvent | null>(() => {
     const list = getEventsWithinHours(events, 48).filter(
       (e) => e.reminderEnabled,
@@ -147,6 +155,39 @@ export default function HomeScreen() {
   const effectiveOccasion: Occasion = eventOverride
     ? occasionForEvent(eventOverride.category)
     : occasion;
+
+  // Fire parallel AI explanations for all generated outfits
+  const triggerExplanations = useCallback(
+    (results: GenerateOutfitResult[], occ: Occasion, w: WeatherInfo) => {
+      const init = new Array<string>(results.length).fill("");
+      setExplanations(init);
+      setExplaining(true);
+      let remaining = results.length;
+      if (remaining === 0) { setExplaining(false); return; }
+      results.forEach((result, i) => {
+        const isComplete = result.top && result.shoes && result.missing.length === 0;
+        if (!isComplete) {
+          remaining--;
+          if (remaining === 0) setExplaining(false);
+          return;
+        }
+        explainOutfit(result, occ, w)
+          .then((text) => {
+            setExplanations((prev) => {
+              const next = [...prev];
+              next[i] = text;
+              return next;
+            });
+          })
+          .catch(() => {})
+          .finally(() => {
+            remaining--;
+            if (remaining === 0) setExplaining(false);
+          });
+      });
+    },
+    [],
+  );
 
   const generate = useCallback(
     async (overrideCategory?: EventCategory) => {
@@ -165,44 +206,31 @@ export default function HomeScreen() {
         eventForWeather && !Number.isNaN(eventTimeMs)
           ? weatherForEventTime(weather, eventTimeMs)
           : weather;
-      const result = generateOutfit(
+
+      const results = generateOutfitOptions(
         items,
         occasion,
         weatherForGen,
         overrideCategory ?? eventOverride?.category,
       );
-      setOutfit(result);
-      setExplanation("");
-      setWorn(false);
-      if (
-        result.top &&
-        result.bottom &&
-        result.shoes &&
-        result.missing.length === 0
-      ) {
-        const occForExplain: Occasion = overrideCategory
-          ? occasionForEvent(overrideCategory)
-          : effectiveOccasion;
-        setExplaining(true);
-        try {
-          const text = await explainOutfit(result, occForExplain, weatherForGen);
-          setExplanation(text);
-        } catch {
-          setExplanation("");
-        } finally {
-          setExplaining(false);
-        }
-      }
+
+      setOutfits(results);
+      setSelectedIndex(0);
+      setWornIndices(new Set());
+      carouselRef.current?.scrollToIndex({ index: 0, animated: false });
+
+      const occForExplain: Occasion = overrideCategory
+        ? occasionForEvent(overrideCategory)
+        : effectiveOccasion;
+
+      triggerExplanations(results, occForExplain, weatherForGen);
     },
-    [items, occasion, weather, eventOverride, effectiveOccasion],
+    [items, occasion, weather, eventOverride, effectiveOccasion, triggerExplanations],
   );
 
   const onGenerateForEvent = useCallback(() => {
     if (!upcomingEvent) return;
-    setEventOverride({
-      category: upcomingEvent.category,
-      event: upcomingEvent,
-    });
+    setEventOverride({ category: upcomingEvent.category, event: upcomingEvent });
     void generate(upcomingEvent.category);
   }, [upcomingEvent, generate]);
 
@@ -210,27 +238,36 @@ export default function HomeScreen() {
     setEventOverride(null);
   }, []);
 
-  // When the user changes occasion (and is not in event-override mode), refresh
+  // Refresh when occasion changes (not in event-override mode)
   useEffect(() => {
     if (eventOverride) return;
-    if (outfit && weather) {
-      const result = generateOutfit(items, occasion, weather);
-      setOutfit(result);
-      setExplanation("");
+    if (outfits.length > 0 && weather) {
+      const results = generateOutfitOptions(items, occasion, weather);
+      setOutfits(results);
+      setSelectedIndex(0);
+      setWornIndices(new Set());
+      setExplanations([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [occasion]);
 
+  const selectedOutfit = outfits[selectedIndex] ?? null;
+
   const outfitItemIds = useMemo(() => {
-    if (!outfit) return [] as string[];
-    return [outfit.top, outfit.bottom, outfit.shoes, outfit.outerwear]
+    if (!selectedOutfit) return [] as string[];
+    return [
+      selectedOutfit.top,
+      selectedOutfit.bottom,
+      selectedOutfit.shoes,
+      selectedOutfit.outerwear,
+    ]
       .filter((i): i is NonNullable<typeof i> => Boolean(i))
       .map((i) => i.id);
-  }, [outfit]);
+  }, [selectedOutfit]);
 
   const onSaveOutfit = async () => {
-    if (!outfit) return;
-    if (outfitItemIds.length < 3) return;
+    if (!selectedOutfit) return;
+    if (outfitItemIds.length < 2) return;
     setSaving(true);
     try {
       await addOutfit(outfitItemIds);
@@ -243,18 +280,32 @@ export default function HomeScreen() {
   };
 
   const onWearOutfit = async () => {
-    if (worn) return;
+    const alreadyWorn = wornIndices.has(selectedIndex);
+    if (alreadyWorn) return;
     if (outfitItemIds.length === 0) return;
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     await markItemsWorn(outfitItemIds, dirtyThreshold);
-    setWorn(true);
+    setWornIndices((prev) => new Set([...prev, selectedIndex]));
   };
 
   const isOutfitComplete =
-    outfit && outfit.top && outfit.bottom && outfit.shoes;
-  const noCleanItems = outfit !== null && outfit.usedDirty;
+    selectedOutfit &&
+    selectedOutfit.top &&
+    selectedOutfit.shoes &&
+    selectedOutfit.missing.length === 0;
+
+  const noCleanItems = outfits.length > 0 && selectedOutfit?.usedDirty === true;
+  const isWorn = wornIndices.has(selectedIndex);
+
+  // Stable viewable-items handler — must not change reference after FlatList mounts
+  const onViewableItemsChangedRef = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+      const first = viewableItems[0];
+      if (first?.index != null) setSelectedIndex(first.index);
+    },
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -315,7 +366,7 @@ export default function HomeScreen() {
           <OccasionTabs value={occasion} onChange={setOccasion} />
         )}
 
-        <SectionLabel>Today’s Outfit</SectionLabel>
+        <SectionLabel>Today's Outfit</SectionLabel>
 
         {items.length < 3 ? (
           <View
@@ -333,8 +384,71 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <OutfitPreview outfit={outfit} />
+        {/* ── Carousel ─────────────────────────────────────────────────── */}
+        {outfits.length === 0 ? (
+          <OutfitPreview outfit={null} />
+        ) : (
+          <View>
+            {/* Break out of the parent ScrollView's horizontal padding so cards
+                are full-bleed, then re-apply padding inside each item */}
+            <FlatList
+              ref={carouselRef}
+              data={outfits}
+              keyExtractor={(_, i) => String(i)}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={{ marginHorizontal: -H_PADDING }}
+              onViewableItemsChanged={onViewableItemsChangedRef.current}
+              viewabilityConfig={VIEWABILITY_CONFIG}
+              getItemLayout={(_, index) => ({
+                length: screenWidth,
+                offset: screenWidth * index,
+                index,
+              })}
+              renderItem={({ item: outfitOption, index }) => (
+                <View style={{ width: screenWidth, paddingHorizontal: H_PADDING }}>
+                  {/* Option label */}
+                  {outfits.length > 1 && (
+                    <View style={styles.optionLabelRow}>
+                      <Text
+                        style={[
+                          styles.optionLabel,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        Option {index + 1} of {outfits.length}
+                      </Text>
+                    </View>
+                  )}
+                  <OutfitPreview outfit={outfitOption} />
+                </View>
+              )}
+            />
 
+            {/* Page dots */}
+            {outfits.length > 1 && (
+              <View style={styles.dotsRow}>
+                {outfits.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.dot,
+                      {
+                        backgroundColor:
+                          i === selectedIndex
+                            ? colors.foreground
+                            : colors.border,
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Dirty-items notice ───────────────────────────────────────── */}
         {noCleanItems ? (
           <View
             style={[
@@ -356,14 +470,16 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {outfit && outfit.missing.length > 0 ? (
+        {selectedOutfit && selectedOutfit.missing.length > 0 ? (
           <Text style={[styles.missingText, { color: colors.mutedForeground }]}>
-            Missing: {outfit.missing.join(", ")}. Add more items to your closet
-            for a complete look.
+            Missing: {selectedOutfit.missing.join(", ")}. Add more items to
+            your closet for a complete look.
           </Text>
         ) : null}
 
-        {(explaining || explanation) && isOutfitComplete ? (
+        {/* ── AI explanation ───────────────────────────────────────────── */}
+        {(explaining || (explanations[selectedIndex] ?? "") !== "") &&
+        isOutfitComplete ? (
           <View
             style={[
               styles.whyCard,
@@ -371,18 +487,14 @@ export default function HomeScreen() {
             ]}
           >
             <View style={styles.whyHeader}>
-              <Feather
-                name="zap"
-                size={14}
-                color={colors.accentForeground}
-              />
+              <Feather name="zap" size={14} color={colors.accentForeground} />
               <Text
                 style={[styles.whyTitle, { color: colors.accentForeground }]}
               >
                 Why this works
               </Text>
             </View>
-            {explaining ? (
+            {explaining && !(explanations[selectedIndex] ?? "") ? (
               <ActivityIndicator
                 size="small"
                 color={colors.accentForeground}
@@ -392,12 +504,13 @@ export default function HomeScreen() {
               <Text
                 style={[styles.whyBody, { color: colors.accentForeground }]}
               >
-                {explanation}
+                {explanations[selectedIndex] ?? ""}
               </Text>
             )}
           </View>
         ) : null}
 
+        {/* ── Action buttons ───────────────────────────────────────────── */}
         <Pressable
           onPress={() => generate()}
           disabled={!canGenerate || weatherLoading}
@@ -414,46 +527,39 @@ export default function HomeScreen() {
             },
           ]}
         >
-          <Feather
-            name="refresh-cw"
-            size={16}
-            color={colors.primaryForeground}
-          />
+          <Feather name="refresh-cw" size={16} color={colors.primaryForeground} />
           <Text
-            style={[
-              styles.generateLabel,
-              { color: colors.primaryForeground },
-            ]}
+            style={[styles.generateLabel, { color: colors.primaryForeground }]}
           >
-            {outfit ? "Regenerate Outfit" : "Generate Outfit"}
+            {outfits.length > 0 ? "Regenerate Outfits" : "Generate Outfit"}
           </Text>
         </Pressable>
 
         {isOutfitComplete ? (
           <Pressable
             onPress={onWearOutfit}
-            disabled={worn}
+            disabled={isWorn}
             style={({ pressed }) => [
               styles.wearBtn,
               {
-                backgroundColor: worn ? colors.card : colors.foreground,
+                backgroundColor: isWorn ? colors.card : colors.foreground,
                 borderColor: colors.foreground,
                 opacity: pressed ? 0.85 : 1,
               },
             ]}
           >
             <Feather
-              name={worn ? "check" : "user-check"}
+              name={isWorn ? "check" : "user-check"}
               size={16}
-              color={worn ? colors.foreground : colors.background}
+              color={isWorn ? colors.foreground : colors.background}
             />
             <Text
               style={[
                 styles.wearLabel,
-                { color: worn ? colors.foreground : colors.background },
+                { color: isWorn ? colors.foreground : colors.background },
               ]}
             >
-              {worn ? "Marked as worn" : "Wear This Outfit"}
+              {isWorn ? "Marked as worn" : "Wear This Outfit"}
             </Text>
           </Pressable>
         ) : null}
@@ -474,14 +580,8 @@ export default function HomeScreen() {
               <ActivityIndicator size="small" color={colors.foreground} />
             ) : (
               <>
-                <Feather
-                  name="bookmark"
-                  size={16}
-                  color={colors.foreground}
-                />
-                <Text
-                  style={[styles.saveLabel, { color: colors.foreground }]}
-                >
+                <Feather name="bookmark" size={16} color={colors.foreground} />
+                <Text style={[styles.saveLabel, { color: colors.foreground }]}>
                   Save to Outfits
                 </Text>
               </>
@@ -557,6 +657,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_500Medium",
   },
+  // Carousel
+  optionLabelRow: {
+    marginBottom: 8,
+  },
+  optionLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  dotsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  // AI explanation
   whyCard: {
     marginTop: 16,
     padding: 14,
@@ -580,6 +703,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     lineHeight: 20,
   },
+  // Buttons
   generateBtn: {
     marginTop: 24,
     paddingVertical: 16,
@@ -638,22 +762,5 @@ const styles = StyleSheet.create({
   clearOverrideText: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-  },
-  favSection: {
-    marginTop: 4,
-  },
-  favRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  favTile: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-  favImg: {
-    width: "100%",
-    height: "100%",
   },
 });
