@@ -54,6 +54,13 @@ function RootLayoutNav() {
         }}
       />
       <Stack.Screen
+        name="studio"
+        options={{
+          presentation: "modal",
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="profile"
         options={{
           title: "Profile",

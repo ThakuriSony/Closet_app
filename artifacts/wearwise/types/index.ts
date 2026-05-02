@@ -13,8 +13,6 @@ export type ItemStatus = "clean" | "dirty";
 export interface ClothingItem {
   id: string;
   imageUri: string;
-  // Local file URI of a background-removed PNG. Falls back to imageUri when
-  // unavailable (e.g. removal failed or hasn't completed yet).
   processedImageUri?: string | null;
   category: Category;
   color: string;
@@ -30,11 +28,24 @@ export const DIRTY_THRESHOLD_MIN = 1;
 export const DIRTY_THRESHOLD_MAX = 5;
 export const DIRTY_THRESHOLD_DEFAULT = 2;
 
+// Position/scale of a single item on a lookbook canvas.
+export interface LookbookItem {
+  itemId: string;
+  x: number;
+  y: number;
+  scale: number;
+}
+
 export interface Outfit {
   id: string;
   itemIds: string[];
   createdAt: number;
   isFavorite: boolean;
+  // "generated" = created by the outfit engine / create-outfit screen (default)
+  // "lookbook"  = created in the Studio canvas editor
+  type?: "generated" | "lookbook";
+  // Canvas layout — only present on lookbook outfits
+  layout?: LookbookItem[];
 }
 
 export type EventCategory =

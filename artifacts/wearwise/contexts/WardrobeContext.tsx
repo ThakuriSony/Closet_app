@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 
-import type { Category, ClothingItem, Outfit } from "@/types";
+import type { Category, ClothingItem, LookbookItem, Outfit } from "@/types";
 
 const ITEMS_KEY = "wearwise:items:v1";
 const OUTFITS_KEY = "wearwise:outfits:v1";
@@ -17,7 +17,6 @@ function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
-// Backfill new fields on records saved before later phases.
 function normalizeItem(raw: Partial<ClothingItem> & { id: string }): ClothingItem {
   return {
     id: raw.id,
@@ -43,7 +42,14 @@ function normalizeOutfit(raw: Partial<Outfit> & { id: string }): Outfit {
     itemIds: Array.isArray(raw.itemIds) ? raw.itemIds : [],
     createdAt: raw.createdAt ?? Date.now(),
     isFavorite: raw.isFavorite === true,
+    type: raw.type === "lookbook" ? "lookbook" : "generated",
+    layout: Array.isArray(raw.layout) ? (raw.layout as LookbookItem[]) : undefined,
   };
+}
+
+interface AddOutfitOpts {
+  type?: "generated" | "lookbook";
+  layout?: LookbookItem[];
 }
 
 interface WardrobeContextValue {
@@ -59,12 +65,13 @@ interface WardrobeContextValue {
   setItemProcessedImage: (id: string, uri: string | null) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   getItem: (id: string) => ClothingItem | undefined;
-  addOutfit: (itemIds: string[]) => Promise<Outfit>;
-  removeOutfit: (id: string) => Promise<void>;
-  markItemsWorn: (
-    itemIds: string[],
-    dirtyThreshold: number,
+  addOutfit: (itemIds: string[], opts?: AddOutfitOpts) => Promise<Outfit>;
+  updateOutfit: (
+    id: string,
+    changes: Partial<Pick<Outfit, "itemIds" | "type" | "layout">>,
   ) => Promise<void>;
+  removeOutfit: (id: string) => Promise<void>;
+  markItemsWorn: (itemIds: string[], dirtyThreshold: number) => Promise<void>;
   markItemWashed: (id: string) => Promise<void>;
   toggleItemFavorite: (id: string) => Promise<void>;
   toggleOutfitFavorite: (id: string) => Promise<void>;
@@ -140,11 +147,6 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     WardrobeContextValue["setItemProcessedImage"]
   >(
     async (id, uri) => {
-      // Use the functional setState form so this callback is never stale —
-      // background removal resolves asynchronously (after router.back() has
-      // already unmounted the AddItem screen) and the component may have
-      // re-rendered with new items in the meantime. Closing over `items`
-      // would silently drop the update for newly-added items.
       let next: ClothingItem[] = [];
       setItems((current) => {
         next = current.map((it) =>
@@ -152,12 +154,8 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
         );
         return next;
       });
-      // Persist outside the setter so we aren't mutating storage inside a
-      // render-phase function.
       await AsyncStorage.setItem(ITEMS_KEY, JSON.stringify(next));
     },
-    // Empty deps — no stale-closure risk because we read state via the
-    // functional updater, not from the closure.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -180,16 +178,28 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addOutfit = useCallback<WardrobeContextValue["addOutfit"]>(
-    async (itemIds) => {
+    async (itemIds, opts) => {
       const outfit: Outfit = {
         id: genId(),
         itemIds,
         createdAt: Date.now(),
         isFavorite: false,
+        type: opts?.type ?? "generated",
+        layout: opts?.layout,
       };
       const next = [outfit, ...outfits];
       await persistOutfits(next);
       return outfit;
+    },
+    [outfits, persistOutfits],
+  );
+
+  const updateOutfit = useCallback<WardrobeContextValue["updateOutfit"]>(
+    async (id, changes) => {
+      const next = outfits.map((o) =>
+        o.id === id ? { ...o, ...changes } : o,
+      );
+      await persistOutfits(next);
     },
     [outfits, persistOutfits],
   );
@@ -264,6 +274,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       removeItem,
       getItem,
       addOutfit,
+      updateOutfit,
       removeOutfit,
       markItemsWorn,
       markItemWashed,
@@ -279,6 +290,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       removeItem,
       getItem,
       addOutfit,
+      updateOutfit,
       removeOutfit,
       markItemsWorn,
       markItemWashed,

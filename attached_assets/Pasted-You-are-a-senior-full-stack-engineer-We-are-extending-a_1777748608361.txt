@@ -1,0 +1,159 @@
+You are a senior full-stack engineer. We are extending an existing React Native (Expo) app called Wearwise.
+
+CURRENT STATE:
+- Tabs: Home, Closet, Outfits, Events
+- Closet items exist in Firestore and show images
+- Outfits tab currently lists saved outfits (generated or manual)
+
+GOAL:
+Add a “Studio / Lookbook” feature inside the existing Outfits tab:
+- Users can create a custom outfit by placing clothing images on a canvas
+- Users can drag items around the canvas
+- Users can pinch to scale items bigger/smaller
+- Users can save the look as an outfit for later
+
+IMPORTANT:
+- Do NOT redesign the whole app
+- Keep UI minimal and consistent with current style
+- Do NOT add unnecessary libraries
+- Prefer existing Expo-standard gesture libraries if already installed
+- This is NOT AI generation; it’s manual outfit design
+
+------------------------------------------------------------
+1) UX / SCREENS TO ADD (MINIMAL)
+
+A. OutfitsScreen updates:
+- Add a button near top: “Create Look” (or a + icon) that opens StudioScreen
+- Keep existing outfit list intact
+
+B. StudioScreen (Canvas editor):
+- Title: “Studio” or “Canvas”
+- A large blank canvas area (use existing background style if you have one, e.g., offwhite with subtle grid)
+- Bottom:
+  - A “+” button to add items
+  - A primary CTA button: “Create” (saves the lookbook outfit)
+- Small action icons for selected item:
+  - Delete selected item (trash icon)
+- Interaction:
+  - Tap an item to select it
+  - Selected item shows a dashed outline box (like reference)
+  - Drag item to reposition
+  - Pinch to scale
+
+C. SelectItemsModal (like reference):
+- Opens when user taps “+”
+- Shows:
+  - Search bar (optional but minimal)
+  - Category filter chips (optional, can reuse existing categories)
+  - Grid of clothing items from Closet (image thumbnails)
+- Allow multi-select + “Import” button
+- On Import: selected items are added onto the canvas (centered with slight offsets)
+
+------------------------------------------------------------
+2) DATA MODEL (KEEP SIMPLE)
+
+We need to save the canvas layout. Do NOT create a complex system.
+
+Option 1 (preferred): Extend existing Outfit model with a layout field for lookbook outfits:
+
+Outfit:
+- id
+- userId
+- items[] (clothing item IDs)
+- createdAt
+- occasion? (optional existing)
+- isFavorite? (if already exists)
+- type: "generated" | "lookbook"
+- layout: Array of
+  {
+    itemId: string,
+    x: number,
+    y: number,
+    scale: number
+  }
+
+Notes:
+- x/y are relative canvas coordinates (pixels in canvas coordinate space)
+- scale default = 1
+
+Do NOT add rotation unless asked.
+
+------------------------------------------------------------
+3) IMPLEMENT DRAG + PINCH (CRITICAL)
+
+Implement a reusable component:
+<CanvasItem />
+
+Each CanvasItem:
+- Renders clothing image (transparent background)
+- Absolutely positioned within the canvas container
+- Supports:
+  - Pan (drag) gesture updates x/y
+  - Pinch gesture updates scale
+- Supports:
+  - Tap selects item (set selectedItemId)
+  - If selected: show dashed border + small corner handles (visual only)
+- Must NOT jitter or reset position
+
+Gesture libraries:
+- Prefer react-native-gesture-handler + react-native-reanimated (Expo standard).
+- First check if these are already installed/configured.
+- If not installed, add only what is necessary (no extra fancy libs).
+
+------------------------------------------------------------
+4) STATE MANAGEMENT
+
+StudioScreen state:
+- canvasItems: Array<{ itemId, imageUrl, x, y, scale }>
+- selectedCanvasItemId: string | null
+- selectedClosetItems for modal import
+
+When importing items:
+- Add each selected closet item to canvasItems with:
+  - x/y centered and slightly offset so they don’t overlap perfectly
+  - scale default 1
+
+Delete:
+- If selectedCanvasItemId exists, remove that canvas item
+
+Save/Create:
+- Save a new Outfit doc:
+  - type="lookbook"
+  - items = canvasItems.map(i => i.itemId)
+  - layout = canvasItems with x/y/scale
+  - createdAt
+- Then navigate back to Outfits list (and show the new lookbook outfit)
+
+------------------------------------------------------------
+5) OUTFITS TAB DISPLAY
+
+In Outfits list:
+- Show lookbook outfits normally in the list (or a small “Lookbook” badge)
+- Tapping a lookbook outfit opens a read-only preview screen OR reopens StudioScreen with saved layout
+  - Minimal version: reopen StudioScreen in “edit” mode so users can adjust and re-save
+
+------------------------------------------------------------
+6) EDGE CASES / UX
+
+- If user tries to Create with 0 items: show message “Add at least one item”
+- If closet has no items: show “Add items to Closet first”
+- Keep performance okay:
+  - Use Image caching if already present
+  - Avoid re-rendering everything on every gesture (use reanimated/shared values)
+
+------------------------------------------------------------
+7) OUTPUT FORMAT REQUIRED
+
+1. Files to modify
+2. New files to create
+3. Code (clean, minimal, modular)
+4. Setup instructions (only if gesture libs needed)
+5. What to test
+
+CONSTRAINTS:
+- No overbuilding
+- No AI here
+- No rotation unless explicitly requested
+- Drag + pinch scale must work smoothly
+
+Start implementing now.

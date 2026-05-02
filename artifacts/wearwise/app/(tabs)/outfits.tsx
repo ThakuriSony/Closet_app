@@ -39,7 +39,7 @@ export default function OutfitsScreen() {
     return outfits.filter((o) => o.isFavorite);
   }, [outfits, filter]);
 
-  const onCreate = () => {
+  const onCreateStudio = () => {
     if (!canCreate) {
       Alert.alert(
         "No items yet",
@@ -50,7 +50,7 @@ export default function OutfitsScreen() {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    router.push("/create-outfit");
+    router.push("/studio");
   };
 
   const onDelete = (outfit: Outfit) => {
@@ -71,6 +71,13 @@ export default function OutfitsScreen() {
     void toggleOutfitFavorite(outfit.id);
   };
 
+  const onEditLookbook = (outfit: Outfit) => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    router.push(`/studio?id=${outfit.id}`);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View
@@ -87,8 +94,10 @@ export default function OutfitsScreen() {
             Outfits
           </Text>
         </View>
+
+        {/* Studio "Create Look" button */}
         <Pressable
-          onPress={onCreate}
+          onPress={onCreateStudio}
           style={({ pressed }) => [
             styles.addBtn,
             {
@@ -112,7 +121,7 @@ export default function OutfitsScreen() {
           <EmptyState
             icon="layers"
             title="No outfits yet"
-            description="Combine a top, bottom, and shoes to save your first outfit."
+            description="Tap + to open Studio and design your first look."
           />
         </View>
       ) : filteredOutfits.length === 0 ? (
@@ -134,6 +143,7 @@ export default function OutfitsScreen() {
             gap: 14,
           }}
           renderItem={({ item }) => {
+            const isLookbook = item.type === "lookbook";
             const outfitItems = item.itemIds
               .map((id) => items.find((i) => i.id === id))
               .filter((v): v is NonNullable<typeof v> => Boolean(v));
@@ -148,7 +158,7 @@ export default function OutfitsScreen() {
                 ]}
               >
                 <View style={styles.previewRow}>
-                  {outfitItems.map((it) => (
+                  {outfitItems.slice(0, 4).map((it) => (
                     <View
                       key={it.id}
                       style={[
@@ -165,15 +175,51 @@ export default function OutfitsScreen() {
                   ))}
                 </View>
                 <View style={styles.cardFooter}>
-                  <Text
-                    style={[
-                      styles.cardTitle,
-                      { color: colors.foreground },
-                    ]}
-                  >
-                    {outfitItems.map((i) => i.category).join(" · ")}
-                  </Text>
+                  <View style={styles.cardLeft}>
+                    {isLookbook && (
+                      <View
+                        style={[
+                          styles.badge,
+                          { backgroundColor: colors.foreground },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.badgeLabel,
+                            { color: colors.background },
+                          ]}
+                        >
+                          Studio
+                        </Text>
+                      </View>
+                    )}
+                    <Text
+                      style={[
+                        styles.cardTitle,
+                        { color: colors.foreground },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {outfitItems.map((i) => i.category).join(" · ")}
+                    </Text>
+                  </View>
                   <View style={styles.actions}>
+                    {isLookbook && (
+                      <Pressable
+                        onPress={() => onEditLookbook(item)}
+                        hitSlop={10}
+                        accessibilityLabel="Edit in Studio"
+                        style={({ pressed }) => ({
+                          opacity: pressed ? 0.5 : 1,
+                        })}
+                      >
+                        <Feather
+                          name="edit-2"
+                          size={18}
+                          color={colors.mutedForeground}
+                        />
+                      </Pressable>
+                    )}
                     <Pressable
                       onPress={() => onToggleFav(item)}
                       hitSlop={10}
@@ -346,10 +392,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
+  },
+  cardLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    overflow: "hidden",
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    flexShrink: 0,
+  },
+  badgeLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.3,
   },
   cardTitle: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+    flexShrink: 1,
   },
   actions: {
     flexDirection: "row",
