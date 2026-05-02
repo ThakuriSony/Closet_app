@@ -49,7 +49,7 @@ const GRID_SPACING = 18;
 const GRID_COLOR = "rgba(180,172,160,0.45)";
 const GRID_BG = "#f5f2ed";
 const ITEM_W_FACTOR = 0.72;   // every item = 72% of card width
-const ITEM_GAP_RAW = 5;       // gap before uniform scale is applied
+const ITEM_GAP_RAW = 0;       // no gap — items stack flush
 
 // Category-specific aspect ratios (rawH = rawW × ratio)
 function categoryAspect(cat: Category): number {
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
   },
   stackedInner: {
     width: "100%",
-    aspectRatio: 0.72,   // portrait — roughly 160 × 222
+    height: 200,          // fixed — never grows with content
     backgroundColor: "#F5F4F0",
     borderRadius: 10,
     overflow: "hidden",
