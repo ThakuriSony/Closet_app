@@ -14,12 +14,19 @@ export const OCCASIONS: Occasion[] = [
   "Formal",
 ];
 
+// ---------------------------------------------------------------------------
+// Outfit templates — the ONLY valid structures the engine may produce
+// ---------------------------------------------------------------------------
+// DRESS_SHOES        → top(dress) + shoes + optional outerwear
+// TOP_BOTTOM_SHOES   → top(non-dress) + bottom + shoes + optional outerwear
+
+type OutfitTemplate = "DRESS_SHOES" | "TOP_BOTTOM_SHOES";
+
 export interface GeneratedOutfit {
   top?: ClothingItem;
   bottom?: ClothingItem;
   shoes?: ClothingItem;
   outerwear?: ClothingItem;
-  // Up to 3 accessories, ranked best-first. Optional — most outfits have none.
   accessories: ClothingItem[];
   missing: Category[];
 }
@@ -46,7 +53,6 @@ const WEATHER_PREFER: Record<WeatherBucket, string[]> = {
   Hot: ["cotton", "linen", "breathable", "shorts", "light", "tank"],
 };
 
-// Map event categories onto occasion buckets used by the engine.
 const EVENT_TO_OCCASION: Record<EventCategory, Occasion> = {
   Work: "Work",
   Casual: "Casual",
@@ -59,6 +65,10 @@ export function occasionForEvent(category: EventCategory): Occasion {
   return EVENT_TO_OCCASION[category];
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function normalize(s: string): string {
   return s.trim().toLowerCase();
 }
@@ -70,10 +80,7 @@ function hasAnyTag(item: ClothingItem, list: string[]): boolean {
 
 function matchCount(item: ClothingItem, list: string[]): number {
   const tags = new Set(item.tags.map(normalize));
-  return list.reduce(
-    (n, t) => (tags.has(normalize(t)) ? n + 1 : n),
-    0,
-  );
+  return list.reduce((n, t) => (tags.has(normalize(t)) ? n + 1 : n), 0);
 }
 
 function buildTagFrequency(items: ClothingItem[]): Map<string, number> {
@@ -87,6 +94,11 @@ function buildTagFrequency(items: ClothingItem[]): Map<string, number> {
   return freq;
 }
 
+// A "Top" item is a dress if it carries the "dress" tag.
+function isDress(item: ClothingItem): boolean {
+  return item.tags.map(normalize).includes("dress");
+}
+
 function scoreItem(
   item: ClothingItem,
   occasion: Occasion,
@@ -95,12 +107,8 @@ function scoreItem(
   strict: boolean,
 ): number {
   let score = 0;
-
-  const occasionMatches = matchCount(item, OCCASION_PREFER[occasion]);
-  score += occasionMatches;
-
-  const weatherMatches = matchCount(item, WEATHER_PREFER[weather]);
-  score += weatherMatches;
+  score += matchCount(item, OCCASION_PREFER[occasion]);
+  score += matchCount(item, WEATHER_PREFER[weather]);
 
   const popularBonus = item.tags.reduce((n, tag) => {
     const f = freq.get(normalize(tag)) ?? 0;
@@ -108,23 +116,18 @@ function scoreItem(
   }, 0);
   score += Math.min(popularBonus, 2);
 
-  if (strict && hasAnyTag(item, OCCASION_AVOID[occasion])) {
-    score -= 5;
-  }
+  if (strict && hasAnyTag(item, OCCASION_AVOID[occasion])) score -= 5;
 
   score += Math.min(item.createdAt / 1e15, 0.001);
-
   return score;
 }
 
 function pickBest(
-  items: ClothingItem[],
-  category: Category,
+  pool: ClothingItem[],
   occasion: Occasion,
   weather: WeatherBucket,
   freq: Map<string, number>,
 ): ClothingItem | undefined {
-  const pool = items.filter((i) => i.category === category);
   if (pool.length === 0) return undefined;
 
   const strictRanked = [...pool].sort(
@@ -133,18 +136,13 @@ function pickBest(
       scoreItem(a, occasion, weather, freq, true),
   );
 
-  const top = strictRanked[0];
-  const topScore = top
-    ? scoreItem(top, occasion, weather, freq, true)
-    : -Infinity;
-
-  if (topScore < 0) {
-    const relaxed = [...pool].sort(
+  const top = strictRanked[0]!;
+  if (scoreItem(top, occasion, weather, freq, true) < 0) {
+    return [...pool].sort(
       (a, b) =>
         scoreItem(b, occasion, weather, freq, false) -
         scoreItem(a, occasion, weather, freq, false),
-    );
-    return relaxed[0];
+    )[0];
   }
   return top;
 }
@@ -155,23 +153,86 @@ function pickBestFor(
   occasion: Occasion,
   weather: WeatherBucket,
   freq: Map<string, number>,
+  // Optional sub-filter within the category (e.g. dress-only / non-dress-only)
+  filter?: (i: ClothingItem) => boolean,
 ): { item: ClothingItem | undefined; usedDirty: boolean } {
-  const clean = items.filter((i) => i.status !== "dirty");
-  const cleanPick = pickBest(clean, category, occasion, weather, freq);
+  const all = items.filter(
+    (i) => i.category === category && (!filter || filter(i)),
+  );
+  const clean = all.filter((i) => i.status !== "dirty");
+
+  const cleanPick = pickBest(clean, occasion, weather, freq);
   if (cleanPick) return { item: cleanPick, usedDirty: false };
 
-  // Fallback: relax the dirty filter if no clean candidate exists.
-  const dirtyPick = pickBest(items, category, occasion, weather, freq);
+  const dirtyPick = pickBest(all, occasion, weather, freq);
   return { item: dirtyPick, usedDirty: Boolean(dirtyPick) };
 }
 
-export interface GenerateOutfitResult extends GeneratedOutfit {
-  usedDirty: boolean;
+// ---------------------------------------------------------------------------
+// Template selection
+// ---------------------------------------------------------------------------
+// Occasions that actively prefer dresses when available.
+const DRESS_PREFERRED_OCCASIONS: Occasion[] = ["Formal", "Party"];
+
+function selectTemplate(
+  items: ClothingItem[],
+  occasion: Occasion,
+): OutfitTemplate {
+  const dresses = items.filter(
+    (i) => i.category === "Top" && i.status !== "dirty" && isDress(i),
+  );
+  const regularTops = items.filter(
+    (i) => i.category === "Top" && i.status !== "dirty" && !isDress(i),
+  );
+  const bottoms = items.filter(
+    (i) => i.category === "Bottom" && i.status !== "dirty",
+  );
+
+  const hasDress = dresses.length > 0;
+  const hasTopBottom = regularTops.length > 0 && bottoms.length > 0;
+
+  // Formal/Party prefer dresses; all other occasions prefer top+bottom.
+  if (DRESS_PREFERRED_OCCASIONS.includes(occasion)) {
+    if (hasDress) return "DRESS_SHOES";
+    if (hasTopBottom) return "TOP_BOTTOM_SHOES";
+  } else {
+    if (hasTopBottom) return "TOP_BOTTOM_SHOES";
+    if (hasDress) return "DRESS_SHOES";
+  }
+
+  // Fallback: use whichever template has enough items (including dirty).
+  const anyDress = items.some((i) => i.category === "Top" && isDress(i));
+  const anyTopBottom =
+    items.some((i) => i.category === "Top" && !isDress(i)) &&
+    items.some((i) => i.category === "Bottom");
+
+  if (DRESS_PREFERRED_OCCASIONS.includes(occasion)) {
+    return anyDress ? "DRESS_SHOES" : "TOP_BOTTOM_SHOES";
+  }
+  return anyTopBottom ? "TOP_BOTTOM_SHOES" : "DRESS_SHOES";
 }
 
-// Decide whether outerwear should be REQUIRED, OPTIONAL or OMITTED based on
-// the day's full forecast. This is what makes the engine robust for places
-// where mornings are cold but afternoons are hot.
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+function isValidOutfit(outfit: GeneratedOutfit): boolean {
+  const topIsDress = outfit.top ? isDress(outfit.top) : false;
+
+  // Dress cannot be combined with a Bottom
+  if (topIsDress && outfit.bottom) return false;
+
+  // No outfit is valid without shoes (except when shoes are in missing — that
+  // means the user simply doesn't own any, which is surfaced separately).
+  if (!outfit.shoes && !outfit.missing.includes("Shoes")) return false;
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Outerwear rule
+// ---------------------------------------------------------------------------
+
 type OuterwearRule = "required" | "optional" | "omit";
 
 function outerwearRule(
@@ -179,114 +240,22 @@ function outerwearRule(
   maxTemp: number,
   tempRange: number,
 ): OuterwearRule {
-  if (maxTemp < 10) return "required"; // cold all day → heavy outerwear
-  if (minTemp > 20) return "omit"; // hot all day → no outerwear
-  if (tempRange > 10) return "required"; // big swing → removable layer
-  return "optional"; // moderate → optional layering
+  if (maxTemp < 10) return "required";
+  if (minTemp > 20) return "omit";
+  if (tempRange > 10) return "required";
+  return "optional";
 }
 
-// For weather-tag scoring we want the engine to prefer items that suit the
-// warmest part of the day (when most people are out), but for outerwear it
-// makes more sense to bias toward the colder reading.
 function bucketForOuterwear(minTemp: number, maxTemp: number): WeatherBucket {
   if (maxTemp < 10) return "Cold";
   if (minTemp > 20) return "Hot";
   return bucketForTemp(Math.round((minTemp + maxTemp) / 2));
 }
 
-export function generateOutfit(
-  items: ClothingItem[],
-  occasion: Occasion,
-  weather: WeatherInfo,
-  eventCategory?: EventCategory,
-): GenerateOutfitResult {
-  const effectiveOccasion: Occasion = eventCategory
-    ? occasionForEvent(eventCategory)
-    : occasion;
+// ---------------------------------------------------------------------------
+// Accessory picker
+// ---------------------------------------------------------------------------
 
-  const freq = buildTagFrequency(items);
-
-  // Daytime (max-temp) bucket biases tops/bottoms/shoes toward what works
-  // when the user is actually out and about.
-  const bodyBucket: WeatherBucket = bucketForTemp(weather.maxTemp);
-  const outerBucket: WeatherBucket = bucketForOuterwear(
-    weather.minTemp,
-    weather.maxTemp,
-  );
-
-  const top = pickBestFor(items, "Top", effectiveOccasion, bodyBucket, freq);
-  const bottom = pickBestFor(
-    items,
-    "Bottom",
-    effectiveOccasion,
-    bodyBucket,
-    freq,
-  );
-  const shoes = pickBestFor(
-    items,
-    "Shoes",
-    effectiveOccasion,
-    bodyBucket,
-    freq,
-  );
-
-  const rule = outerwearRule(
-    weather.minTemp,
-    weather.maxTemp,
-    weather.tempRange,
-  );
-
-  let outerwear: { item: ClothingItem | undefined; usedDirty: boolean } = {
-    item: undefined,
-    usedDirty: false,
-  };
-  if (rule !== "omit") {
-    outerwear = pickBestFor(
-      items,
-      "Outerwear",
-      effectiveOccasion,
-      outerBucket,
-      freq,
-    );
-  }
-
-  // Accessories are optional — included only when the user actually has some.
-  // Doesn't add to the "missing" list, since most outfits don't need one.
-  // We pick up to 3 best-scoring accessories so they can render as a cluster.
-  const accessories = pickTopAccessories(
-    items,
-    effectiveOccasion,
-    bodyBucket,
-    freq,
-    3,
-  );
-
-  const missing: Category[] = [];
-  if (!top.item) missing.push("Top");
-  if (!bottom.item) missing.push("Bottom");
-  if (!shoes.item) missing.push("Shoes");
-  if (rule === "required" && !outerwear.item) missing.push("Outerwear");
-
-  const usedDirty =
-    top.usedDirty ||
-    bottom.usedDirty ||
-    shoes.usedDirty ||
-    outerwear.usedDirty ||
-    accessories.some((a) => a.status === "dirty");
-
-  return {
-    top: top.item,
-    bottom: bottom.item,
-    shoes: shoes.item,
-    outerwear: outerwear.item,
-    accessories,
-    missing,
-    usedDirty,
-  };
-}
-
-// Score every accessory in the wardrobe for the current occasion + weather
-// and return the top N (preferring clean items, falling back to dirty).
 function pickTopAccessories(
   items: ClothingItem[],
   occasion: Occasion,
@@ -302,15 +271,135 @@ function pickTopAccessories(
     ...candidates.filter((c) => c.status === "dirty"),
   ];
 
-  const scored = cleanFirst
-    .map((item) => ({
-      item,
-      // Non-strict scoring for accessories: most accessories are occasion-
-      // agnostic (a watch works for "Casual" and "Formal" alike) so we don't
-      // want to penalize them for missing the avoid-list signal.
-      score: scoreItem(item, occasion, weather, freq, false),
-    }))
-    .sort((a, b) => b.score - a.score);
+  return cleanFirst
+    .map((item) => ({ item, score: scoreItem(item, occasion, weather, freq, false) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((s) => s.item);
+}
 
-  return scored.slice(0, limit).map((s) => s.item);
+// ---------------------------------------------------------------------------
+// Main export
+// ---------------------------------------------------------------------------
+
+export interface GenerateOutfitResult extends GeneratedOutfit {
+  usedDirty: boolean;
+}
+
+export function generateOutfit(
+  items: ClothingItem[],
+  occasion: Occasion,
+  weather: WeatherInfo,
+  eventCategory?: EventCategory,
+): GenerateOutfitResult {
+  const effectiveOccasion: Occasion = eventCategory
+    ? occasionForEvent(eventCategory)
+    : occasion;
+
+  const freq = buildTagFrequency(items);
+  const bodyBucket: WeatherBucket = bucketForTemp(weather.maxTemp);
+  const outerBucket: WeatherBucket = bucketForOuterwear(
+    weather.minTemp,
+    weather.maxTemp,
+  );
+
+  // Step 1 — Choose template FIRST so item picking is constrained from the start
+  const template = selectTemplate(items, effectiveOccasion);
+
+  // Step 2 — Pick items strictly within template constraints
+  const top = pickBestFor(
+    items,
+    "Top",
+    effectiveOccasion,
+    bodyBucket,
+    freq,
+    template === "DRESS_SHOES" ? isDress : (i) => !isDress(i),
+  );
+
+  const bottom =
+    template === "TOP_BOTTOM_SHOES"
+      ? pickBestFor(items, "Bottom", effectiveOccasion, bodyBucket, freq)
+      : { item: undefined as ClothingItem | undefined, usedDirty: false };
+
+  const shoes = pickBestFor(items, "Shoes", effectiveOccasion, bodyBucket, freq);
+
+  // Step 3 — Outerwear (weather-gated, template-agnostic)
+  const rule = outerwearRule(weather.minTemp, weather.maxTemp, weather.tempRange);
+  const outerwear: { item: ClothingItem | undefined; usedDirty: boolean } =
+    rule !== "omit"
+      ? pickBestFor(items, "Outerwear", effectiveOccasion, outerBucket, freq)
+      : { item: undefined, usedDirty: false };
+
+  // Step 4 — Accessories
+  const accessories = pickTopAccessories(items, effectiveOccasion, bodyBucket, freq, 3);
+
+  // Step 5 — Build missing list
+  const missing: Category[] = [];
+  if (!top.item) missing.push("Top");
+  if (template === "TOP_BOTTOM_SHOES" && !bottom.item) missing.push("Bottom");
+  if (!shoes.item) missing.push("Shoes");
+  if (rule === "required" && !outerwear.item) missing.push("Outerwear");
+
+  const candidate: GenerateOutfitResult = {
+    top: top.item,
+    bottom: bottom.item,
+    shoes: shoes.item,
+    outerwear: outerwear.item,
+    accessories,
+    missing,
+    usedDirty:
+      top.usedDirty ||
+      bottom.usedDirty ||
+      shoes.usedDirty ||
+      outerwear.usedDirty ||
+      accessories.some((a) => a.status === "dirty"),
+  };
+
+  // Step 6 — Safety check: if somehow invalid (shouldn't happen), retry with
+  // the opposite template before returning. We log so it surfaces in dev.
+  if (!isValidOutfit(candidate)) {
+    console.warn(
+      "[outfitEngine] isValidOutfit failed — retrying with opposite template",
+      { template, top: top.item?.tags, bottom: bottom.item?.id },
+    );
+
+    const fallbackTemplate: OutfitTemplate =
+      template === "DRESS_SHOES" ? "TOP_BOTTOM_SHOES" : "DRESS_SHOES";
+
+    const fTop = pickBestFor(
+      items,
+      "Top",
+      effectiveOccasion,
+      bodyBucket,
+      freq,
+      fallbackTemplate === "DRESS_SHOES" ? isDress : (i) => !isDress(i),
+    );
+    const fBottom =
+      fallbackTemplate === "TOP_BOTTOM_SHOES"
+        ? pickBestFor(items, "Bottom", effectiveOccasion, bodyBucket, freq)
+        : { item: undefined as ClothingItem | undefined, usedDirty: false };
+
+    const fMissing: Category[] = [];
+    if (!fTop.item) fMissing.push("Top");
+    if (fallbackTemplate === "TOP_BOTTOM_SHOES" && !fBottom.item) fMissing.push("Bottom");
+    if (!shoes.item) fMissing.push("Shoes");
+    if (rule === "required" && !outerwear.item) fMissing.push("Outerwear");
+
+    return {
+      top: fTop.item,
+      bottom: fBottom.item,
+      shoes: shoes.item,
+      outerwear: outerwear.item,
+      accessories,
+      missing: fMissing,
+      usedDirty:
+        fTop.usedDirty ||
+        fBottom.usedDirty ||
+        shoes.usedDirty ||
+        outerwear.usedDirty ||
+        accessories.some((a) => a.status === "dirty"),
+    };
+  }
+
+  return candidate;
 }
