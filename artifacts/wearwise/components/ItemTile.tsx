@@ -1,7 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import {
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import type { ClothingItem } from "@/types";
@@ -36,6 +42,36 @@ export function ItemTile({
     console.log("Using processed image:", processedImageUri);
   }
 
+  // Shimmer pulse while background removal is pending.
+  const shimmer = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (hasProcessed) {
+      shimmer.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [hasProcessed, shimmer]);
+
+  const shimmerOpacity = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.18],
+  });
+
   return (
     <Pressable
       onPress={onPress}
@@ -65,6 +101,19 @@ export function ItemTile({
           contentFit={hasProcessed ? "contain" : "cover"}
           transition={150}
         />
+
+        {/* Shimmer overlay — visible while background removal is in progress */}
+        {!hasProcessed ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFillObject,
+              styles.shimmerOverlay,
+              { opacity: shimmerOpacity },
+            ]}
+          />
+        ) : null}
+
         {isDirty ? (
           <View style={[styles.badge, { backgroundColor: colors.foreground }]}>
             <Text style={[styles.badgeText, { color: colors.background }]}>
@@ -72,6 +121,7 @@ export function ItemTile({
             </Text>
           </View>
         ) : null}
+
         {onToggleFavorite ? (
           <Pressable
             onPress={onToggleFavorite}
@@ -97,6 +147,7 @@ export function ItemTile({
           </Pressable>
         ) : null}
       </View>
+
       <View style={styles.meta}>
         <Text
           numberOfLines={1}
@@ -129,6 +180,10 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
+  },
+  shimmerOverlay: {
+    backgroundColor: "#ffffff",
+    borderRadius: 15,
   },
   badge: {
     position: "absolute",

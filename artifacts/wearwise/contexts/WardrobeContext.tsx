@@ -140,12 +140,26 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
     WardrobeContextValue["setItemProcessedImage"]
   >(
     async (id, uri) => {
-      const next = items.map((it) =>
-        it.id === id ? { ...it, processedImageUri: uri } : it,
-      );
-      await persistItems(next);
+      // Use the functional setState form so this callback is never stale —
+      // background removal resolves asynchronously (after router.back() has
+      // already unmounted the AddItem screen) and the component may have
+      // re-rendered with new items in the meantime. Closing over `items`
+      // would silently drop the update for newly-added items.
+      let next: ClothingItem[] = [];
+      setItems((current) => {
+        next = current.map((it) =>
+          it.id === id ? { ...it, processedImageUri: uri } : it,
+        );
+        return next;
+      });
+      // Persist outside the setter so we aren't mutating storage inside a
+      // render-phase function.
+      await AsyncStorage.setItem(ITEMS_KEY, JSON.stringify(next));
     },
-    [items, persistItems],
+    // Empty deps — no stale-closure risk because we read state via the
+    // functional updater, not from the closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
   const removeItem = useCallback<WardrobeContextValue["removeItem"]>(
