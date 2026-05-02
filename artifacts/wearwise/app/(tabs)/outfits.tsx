@@ -4,135 +4,138 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
-  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/EmptyState";
-import { CanvasRenderer } from "@/components/CanvasRenderer";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
-import type {
-  ClothingItem,
-  LookbookItem,
-  LookbookMeta,
-  Outfit,
-} from "@/types";
+import type { Category, ClothingItem, Outfit } from "@/types";
 
-const H_PADDING = 20;
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const H_PADDING = 16;
+const COL_GAP = 10;
+const ITEM_GAP = 4; // vertical gap between stacked images
+
+// Category stacking order: top garment → bottom → shoes → accessories
+const STACK_ORDER: Partial<Record<Category, number>> = {
+  Outerwear: 0,
+  Top: 1,
+  Bottom: 2,
+  Shoes: 3,
+  Accessories: 4,
+};
 
 type OutfitFilter = "All" | "Favorites";
 
 // ---------------------------------------------------------------------------
-// Lookbook mini-canvas preview
+// StackedOutfitPreview
 // ---------------------------------------------------------------------------
 
 /**
- * Renders a pixel-accurate miniature of the Studio canvas using CanvasRenderer.
+ * Renders clothing items stacked top-to-bottom ordered by category.
  *
- * CanvasRenderer applies a bounding-box fit: it scales the outfit's *content*
- * (not the full canvas) to fill the preview square, preserving exact relative
- * spacing and z-order from Studio.
+ * Layout math:
+ *   itemW  = cardW × 0.60   (60% of card width per image, square)
+ *   rawH   = n × itemW + (n-1) × ITEM_GAP
+ *   scale  = if rawH > availH → availH / rawH  else 1
+ *   Entire stack is centered horizontally and vertically inside the card.
  */
-function LookbookPreview({
-  layout,
-  layoutMeta,
-  allItems,
+function StackedOutfitPreview({
+  items,
   onPress,
 }: {
-  layout: LookbookItem[];
-  layoutMeta: LookbookMeta;
-  allItems: ClothingItem[];
+  items: ClothingItem[];
   onPress?: () => void;
 }) {
-  const [previewSize, setPreviewSize] = useState(0);
+  const [cardDims, setCardDims] = useState({ w: 0, h: 0 });
 
-  // Attach imageUri to each layout entry for CanvasRenderer.
-  const rendererItems = useMemo(
+  const sorted = useMemo(
     () =>
-      layout
-        .map((entry) => {
-          const item = allItems.find((i) => i.id === entry.itemId);
-          if (!item) return null;
-          return {
-            ...entry,
-            imageUri:
-              item.processedImageUri && item.processedImageUri.length > 0
-                ? item.processedImageUri
-                : item.imageUri,
-          };
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null),
-    [layout, allItems],
+      [...items].sort(
+        (a, b) =>
+          (STACK_ORDER[a.category] ?? 9) - (STACK_ORDER[b.category] ?? 9),
+      ),
+    [items],
   );
+
+  const { w: cardW, h: cardH } = cardDims;
+
+  // Compute positions once card has been measured.
+  const positions = useMemo(() => {
+    if (cardW === 0 || cardH === 0 || sorted.length === 0) return [];
+
+    const availH = cardH * 0.92;
+    const rawItemW = cardW * 0.60;
+    const n = sorted.length;
+    const rawTotalH = n * rawItemW + (n - 1) * ITEM_GAP;
+
+    const scale = rawTotalH > availH ? availH / rawTotalH : 1;
+    const itemW = rawItemW * scale;
+    const gap = ITEM_GAP * scale;
+    const totalH = n * itemW + (n - 1) * gap;
+
+    const startX = (cardW - itemW) / 2;
+    const startY = (cardH - totalH) / 2;
+
+    return sorted.map((item, idx) => ({
+      item,
+      left: startX,
+      top: startY + idx * (itemW + gap),
+      size: itemW,
+    }));
+  }, [sorted, cardW, cardH]);
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        styles.lookbookContainer,
+        styles.stackedOuter,
         { opacity: pressed ? 0.88 : 1 },
       ]}
     >
       <View
-        style={styles.lookbookCanvas}
-        onLayout={(e) => setPreviewSize(e.nativeEvent.layout.width)}
+        style={styles.stackedInner}
+        onLayout={(e) =>
+          setCardDims({
+            w: e.nativeEvent.layout.width,
+            h: e.nativeEvent.layout.height,
+          })
+        }
       >
-        <CanvasGridLines size={previewSize} />
-        <CanvasRenderer
-          items={rendererItems}
-          meta={layoutMeta}
-          previewSize={previewSize}
-        />
+        {positions.map(({ item, left, top, size }) => {
+          const uri =
+            item.processedImageUri && item.processedImageUri.length > 0
+              ? item.processedImageUri
+              : item.imageUri;
+          return (
+            <Image
+              key={item.id}
+              source={{ uri }}
+              style={{
+                position: "absolute",
+                left,
+                top,
+                width: size,
+                height: size,
+              }}
+              contentFit="contain"
+            />
+          );
+        })}
       </View>
     </Pressable>
   );
-}
-
-function CanvasGridLines({ size }: { size: number }) {
-  const SPACING = 22;
-  const COLOR = "rgba(0,0,0,0.06)";
-
-  if (size === 0) return null;
-
-  const lines: React.ReactNode[] = [];
-  for (let y = SPACING; y < size; y += SPACING) {
-    lines.push(
-      <View
-        key={`h${y}`}
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          top: y,
-          height: StyleSheet.hairlineWidth,
-          backgroundColor: COLOR,
-        }}
-      />,
-    );
-  }
-  for (let x = SPACING; x < size; x += SPACING) {
-    lines.push(
-      <View
-        key={`v${x}`}
-        style={{
-          position: "absolute",
-          top: 0,
-          bottom: 0,
-          left: x,
-          width: StyleSheet.hairlineWidth,
-          backgroundColor: COLOR,
-        }}
-      />,
-    );
-  }
-  return <>{lines}</>;
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +197,7 @@ export default function OutfitsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
       <View
         style={[
           styles.header,
@@ -220,12 +224,14 @@ export default function OutfitsScreen() {
         </Pressable>
       </View>
 
+      {/* Filter chips */}
       {outfits.length > 0 && (
         <View style={styles.filterRow}>
           <OutfitFilterChips value={filter} onChange={setFilter} />
         </View>
       )}
 
+      {/* List / empty states */}
       {outfits.length === 0 ? (
         <View style={styles.emptyWrap}>
           <EmptyState
@@ -246,22 +252,18 @@ export default function OutfitsScreen() {
         <FlatList
           data={filteredOutfits}
           keyExtractor={(o) => o.id}
+          numColumns={2}
+          columnWrapperStyle={{ gap: COL_GAP }}
           contentContainerStyle={{
             paddingHorizontal: H_PADDING,
             paddingTop: 4,
             paddingBottom: insets.bottom + tabBarOffset,
-            gap: 14,
+            gap: COL_GAP,
           }}
-          renderItem={({ item }) => {
-            const isLookbook = item.type === "lookbook";
-            // Canvas preview requires normalised layout + metadata (new format).
-            const hasCanvasPreview =
-              isLookbook &&
-              Array.isArray(item.layout) &&
-              item.layout.length > 0 &&
-              item.layoutMeta != null;
+          renderItem={({ item: outfit }) => {
+            const isLookbook = outfit.type === "lookbook";
 
-            const outfitItems = item.itemIds
+            const outfitItems = outfit.itemIds
               .map((id) => items.find((i) => i.id === id))
               .filter((v): v is NonNullable<typeof v> => Boolean(v));
 
@@ -269,69 +271,44 @@ export default function OutfitsScreen() {
               <View
                 style={[
                   styles.card,
-                  { backgroundColor: colors.card, borderColor: colors.border },
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                  },
                 ]}
               >
-                {/* Preview */}
-                {hasCanvasPreview ? (
-                  <LookbookPreview
-                    layout={item.layout as LookbookItem[]}
-                    layoutMeta={item.layoutMeta as LookbookMeta}
-                    allItems={items}
-                    onPress={() => onEditLookbook(item)}
-                  />
-                ) : (
-                  <View style={styles.previewRow}>
-                    {outfitItems.slice(0, 4).map((it) => (
-                      <View
-                        key={it.id}
-                        style={[
-                          styles.preview,
-                          { backgroundColor: colors.secondary },
-                        ]}
-                      >
-                        <Image
-                          source={{ uri: it.imageUri }}
-                          style={styles.previewImg}
-                          contentFit="cover"
-                        />
-                      </View>
-                    ))}
-                  </View>
-                )}
+                {/* Stacked thumbnail */}
+                <StackedOutfitPreview
+                  items={outfitItems}
+                  onPress={isLookbook ? () => onEditLookbook(outfit) : undefined}
+                />
 
                 {/* Footer */}
                 <View style={styles.cardFooter}>
-                  <View style={styles.cardLeft}>
-                    {isLookbook && (
-                      <View
+                  {/* Studio badge */}
+                  {isLookbook && (
+                    <View
+                      style={[
+                        styles.badge,
+                        { backgroundColor: colors.foreground },
+                      ]}
+                    >
+                      <Text
                         style={[
-                          styles.badge,
-                          { backgroundColor: colors.foreground },
+                          styles.badgeLabel,
+                          { color: colors.background },
                         ]}
                       >
-                        <Text
-                          style={[
-                            styles.badgeLabel,
-                            { color: colors.background },
-                          ]}
-                        >
-                          Studio
-                        </Text>
-                      </View>
-                    )}
-                    <Text
-                      style={[styles.cardTitle, { color: colors.foreground }]}
-                      numberOfLines={1}
-                    >
-                      {outfitItems.map((i) => i.category).join(" · ")}
-                    </Text>
-                  </View>
+                        Studio
+                      </Text>
+                    </View>
+                  )}
 
+                  {/* Action buttons */}
                   <View style={styles.actions}>
                     {isLookbook && (
                       <Pressable
-                        onPress={() => onEditLookbook(item)}
+                        onPress={() => onEditLookbook(outfit)}
                         hitSlop={10}
                         accessibilityLabel="Edit in Studio"
                         style={({ pressed }) => ({
@@ -340,34 +317,38 @@ export default function OutfitsScreen() {
                       >
                         <Feather
                           name="edit-2"
-                          size={18}
+                          size={16}
                           color={colors.mutedForeground}
                         />
                       </Pressable>
                     )}
                     <Pressable
-                      onPress={() => onToggleFav(item)}
+                      onPress={() => onToggleFav(outfit)}
                       hitSlop={10}
-                      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                      style={({ pressed }) => ({
+                        opacity: pressed ? 0.5 : 1,
+                      })}
                     >
                       <Feather
                         name="heart"
-                        size={18}
+                        size={16}
                         color={
-                          item.isFavorite
+                          outfit.isFavorite
                             ? colors.primary
                             : colors.mutedForeground
                         }
                       />
                     </Pressable>
                     <Pressable
-                      onPress={() => onDelete(item)}
+                      onPress={() => onDelete(outfit)}
                       hitSlop={10}
-                      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                      style={({ pressed }) => ({
+                        opacity: pressed ? 0.5 : 1,
+                      })}
                     >
                       <Feather
                         name="trash-2"
-                        size={18}
+                        size={16}
                         color={colors.mutedForeground}
                       />
                     </Pressable>
@@ -424,7 +405,9 @@ function OutfitFilterChips({
               style={[
                 styles.chipLabel,
                 {
-                  color: active ? colors.background : colors.mutedForeground,
+                  color: active
+                    ? colors.background
+                    : colors.mutedForeground,
                 },
               ]}
             >
@@ -443,6 +426,7 @@ function OutfitFilterChips({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
   header: {
     paddingHorizontal: H_PADDING,
     paddingBottom: 14,
@@ -469,6 +453,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   filterRow: {
     paddingHorizontal: H_PADDING,
     paddingBottom: 14,
@@ -491,78 +476,55 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
+
   emptyWrap: { flex: 1 },
 
-  // Card
+  // 2-column card
   card: {
+    flex: 1,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: 12,
-  },
-
-  // Generated outfit preview
-  previewRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  preview: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: 12,
+    padding: 10,
     overflow: "hidden",
   },
-  previewImg: {
-    width: "100%",
-    height: "100%",
-  },
 
-  // Lookbook canvas preview
-  lookbookContainer: {
+  // Stacked preview container (portrait)
+  stackedOuter: {
     width: "100%",
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: "hidden",
   },
-  lookbookCanvas: {
+  stackedInner: {
     width: "100%",
-    aspectRatio: 1,
-    backgroundColor: "#FAF7F0",
+    aspectRatio: 0.72,   // portrait — roughly 160 × 222
+    backgroundColor: "#F5F4F0",
+    borderRadius: 10,
     overflow: "hidden",
   },
 
   // Card footer
   cardFooter: {
-    marginTop: 12,
+    marginTop: 8,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-  },
-  cardLeft: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    overflow: "hidden",
+    gap: 6,
   },
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 999,
     flexShrink: 0,
   },
   badgeLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.3,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    flexShrink: 1,
   },
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 12,
+    marginLeft: "auto",
   },
 });
