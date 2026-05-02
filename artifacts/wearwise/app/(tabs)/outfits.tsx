@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/EmptyState";
-import { CANVAS_ITEM_SIZE } from "@/components/CanvasItem";
+import { CanvasRenderer } from "@/components/CanvasRenderer";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
 import type {
@@ -34,16 +34,11 @@ type OutfitFilter = "All" | "Favorites";
 // ---------------------------------------------------------------------------
 
 /**
- * Renders a pixel-accurate miniature of the Studio canvas.
+ * Renders a pixel-accurate miniature of the Studio canvas using CanvasRenderer.
  *
- * Strategy:
- *   scaleFactor = previewSize / Math.max(canvasW, canvasH)
- *   item.left   = item.nx * canvasW * scaleFactor + centerOffsetX
- *   item.top    = item.ny * canvasH * scaleFactor + centerOffsetY
- *   item.size   = item.s  * CANVAS_ITEM_SIZE * scaleFactor
- *
- * This mirrors exactly how Studio places items, just scaled down uniformly.
- * The canvas is letterboxed (centered) inside the square preview container.
+ * CanvasRenderer applies a bounding-box fit: it scales the outfit's *content*
+ * (not the full canvas) to fill the preview square, preserving exact relative
+ * spacing and z-order from Studio.
  */
 function LookbookPreview({
   layout,
@@ -58,20 +53,23 @@ function LookbookPreview({
 }) {
   const [previewSize, setPreviewSize] = useState(0);
 
-  const { canvasW, canvasH } = layoutMeta;
-
-  // Scale the entire canvas to fit inside the square preview.
-  const scaleFactor =
-    previewSize > 0 ? previewSize / Math.max(canvasW, canvasH) : 0;
-
-  // Center the scaled canvas rect inside the square.
-  const offsetX = (previewSize - canvasW * scaleFactor) / 2;
-  const offsetY = (previewSize - canvasH * scaleFactor) / 2;
-
-  // Honour saved z-order in the preview too.
-  const sortedLayout = useMemo(
-    () => [...layout].sort((a, b) => a.z - b.z),
-    [layout],
+  // Attach imageUri to each layout entry for CanvasRenderer.
+  const rendererItems = useMemo(
+    () =>
+      layout
+        .map((entry) => {
+          const item = allItems.find((i) => i.id === entry.itemId);
+          if (!item) return null;
+          return {
+            ...entry,
+            imageUri:
+              item.processedImageUri && item.processedImageUri.length > 0
+                ? item.processedImageUri
+                : item.imageUri,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null),
+    [layout, allItems],
   );
 
   return (
@@ -86,38 +84,12 @@ function LookbookPreview({
         style={styles.lookbookCanvas}
         onLayout={(e) => setPreviewSize(e.nativeEvent.layout.width)}
       >
-        {/* Subtle grid */}
         <CanvasGridLines size={previewSize} />
-
-        {scaleFactor > 0 &&
-          sortedLayout.map((entry, idx) => {
-            const item = allItems.find((i) => i.id === entry.itemId);
-            if (!item) return null;
-            const uri =
-              item.processedImageUri && item.processedImageUri.length > 0
-                ? item.processedImageUri
-                : item.imageUri;
-
-            const size = entry.s * CANVAS_ITEM_SIZE * scaleFactor;
-            const left = entry.nx * canvasW * scaleFactor + offsetX;
-            const top = entry.ny * canvasH * scaleFactor + offsetY;
-
-            return (
-              <Image
-                key={`${entry.itemId}-${idx}`}
-                source={{ uri }}
-                style={{
-                  position: "absolute",
-                  left,
-                  top,
-                  width: size,
-                  height: size,
-                  zIndex: entry.z,
-                }}
-                contentFit="contain"
-              />
-            );
-          })}
+        <CanvasRenderer
+          items={rendererItems}
+          meta={layoutMeta}
+          previewSize={previewSize}
+        />
       </View>
     </Pressable>
   );

@@ -1,0 +1,121 @@
+You are a senior React Native (Expo) engineer. We are fixing the Studio/Lookbook outfit preview and canvas layering in Wearwise.
+
+CURRENT BUG:
+Outfits tab preview for Studio outfits is still wrong:
+- items are centered but jumbled/overlapping incorrectly
+- preview does NOT match how the user designed the layout in the Studio canvas
+
+REQUIRED OUTCOME:
+1) The preview MUST look like a mini snapshot of the Studio canvas design:
+   - preserve relative spacing and arrangement exactly as designed
+   - fit inside a square card neatly (like reference screenshot)
+   - NO editor UI in preview (no dashed selection box)
+2) In Studio canvas: whichever clothing item is tapped/selected must come to the front (top layer).
+
+IMPORTANT:
+- Do NOT “auto-arrange” outfits.
+- Do NOT re-layout items into a template.
+- Preview must reflect the user’s design.
+- Fix coordinate math and scaling correctly.
+
+------------------------------------------------------------
+PART A — FIX PREVIEW BY REUSING CANVAS RENDERING LOGIC
+
+1) Create a shared renderer component used by BOTH Studio and Preview:
+   - CanvasRenderer.tsx
+   Props:
+     - items: [{ itemId, imageUrl, x, y, scale, z }]
+     - mode: "editor" | "preview"
+     - width, height
+
+2) Studio should use CanvasRenderer(mode="editor") with gestures.
+   Preview should use CanvasRenderer(mode="preview") with NO gestures.
+
+3) Make sure Studio and Preview use the SAME base image sizing rule.
+   Define ONE constant:
+     BASE_ITEM_SIZE_FACTOR = 0.32
+   baseItemSize = canvasWidth * BASE_ITEM_SIZE_FACTOR
+   Use the SAME formula in both modes.
+
+------------------------------------------------------------
+PART B — PREVIEW MUST APPLY A SINGLE GLOBAL FIT TRANSFORM (CRITICAL)
+
+The preview is a square card (previewSize x previewSize).
+
+Preview must NOT reuse raw x/y directly without scaling.
+Preview must NOT normalize each item individually.
+
+Instead:
+1) Compute each item’s rendered size in Studio units:
+   itemW = baseItemSize * item.scale
+   itemH = baseItemSize * item.scale   (assume square thumbnails)
+
+2) Compute bounding box in Studio coordinate space:
+   minX = min(item.x)
+   minY = min(item.y)
+   maxX = max(item.x + itemW)
+   maxY = max(item.y + itemH)
+
+3) Compute bounds:
+   boundsW = maxX - minX
+   boundsH = maxY - minY
+
+4) Compute a single global scale so the entire outfit fits in the square preview:
+   fitScale = min(previewSize / boundsW, previewSize / boundsH) * 0.92
+
+5) Compute global offsets to center the outfit:
+   outfitCenterX = minX + boundsW/2
+   outfitCenterY = minY + boundsH/2
+   previewCenterX = previewSize/2
+   previewCenterY = previewSize/2
+
+   offsetX = previewCenterX - outfitCenterX * fitScale
+   offsetY = previewCenterY - outfitCenterY * fitScale
+
+6) Render each item in preview using LEFT/TOP (NOT translate transforms):
+   left = item.x * fitScale + offsetX
+   top  = item.y * fitScale + offsetY
+   scale = item.scale * fitScale
+
+This preserves the user’s arrangement exactly and prevents jumbling.
+
+------------------------------------------------------------
+PART C — LAYERING: TAP BRINGS ITEM TO FRONT (Z-ORDER)
+
+1) Add z to each canvas item.
+2) On tap/select OR on gesture start:
+   - set selectedItemId = item.id
+   - set item.z = maxZ + 1
+   - update state immediately so it visually comes to front
+3) Persist z in saved layout.
+4) Render items sorted by z ascending AND set:
+   style: { zIndex: z, elevation: z, position:"absolute" }
+
+------------------------------------------------------------
+PART D — DEBUG OUTPUT (MANDATORY)
+
+Add temporary debug logs to verify correctness:
+- log saved layout items (x,y,scale,z)
+- log computed preview boundsW/boundsH and fitScale
+- log first item’s computed preview left/top/scale
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Updated/added files:
+   - CanvasRenderer.tsx
+   - StudioScreen.tsx updates for bring-to-front
+   - OutfitsPreviewCard.tsx (or equivalent) uses CanvasRenderer(mode="preview")
+2) Explanation of why previous preview was jumbled and how this fixes it
+3) Testing steps:
+   - Design an outfit with large spacing in Studio
+   - Save
+   - Confirm preview matches arrangement
+   - Tap an item in Studio and confirm it comes to front
+
+CONSTRAINTS:
+- No UI redesign
+- No new heavy libraries
+- No rotation
+- Must preserve user’s design in preview
+
+Start fixing now.
