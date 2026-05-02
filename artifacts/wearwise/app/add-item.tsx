@@ -200,11 +200,14 @@ export default function AddItemScreen() {
       })
         .then((processedUri) => {
           if (processedUri) {
+            console.log("[BgRemoval] processed PNG ready:", processedUri.slice(0, 80));
             void setItemProcessedImage(saved.id, processedUri);
+          } else {
+            console.log("[BgRemoval] returned null — keeping original image");
           }
         })
-        .catch(() => {
-          // Silent fallback — the original image is already in place.
+        .catch((err) => {
+          console.log("[BgRemoval] pipeline error:", err);
         });
       router.back();
     } catch (e) {

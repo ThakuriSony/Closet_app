@@ -69,9 +69,16 @@ const ASPECT: Record<SlotKind, number> = {
 };
 
 function displayUri(item: ClothingItem): string {
-  return item.processedImageUri && item.processedImageUri.length > 0
-    ? item.processedImageUri
-    : item.imageUri;
+  const uri =
+    item.processedImageUri && item.processedImageUri.length > 0
+      ? item.processedImageUri
+      : item.imageUri;
+  console.log(
+    `[OutfitPreview] ${item.category} (${item.id.slice(-6)}) using:`,
+    item.processedImageUri ? "processedImageUri ✓" : "original imageUri",
+    uri.slice(0, 60),
+  );
+  return uri;
 }
 
 // Returns the layout blocks for the given canvas size and outfit.
@@ -252,7 +259,7 @@ export function OutfitPreview({ outfit }: Props) {
       style={[styles.card, { backgroundColor: colors.secondary }]}
     >
       {width > 0 ? (
-        <View style={{ height: canvasHeight, width: "100%" }}>
+        <View style={{ height: canvasHeight, width: "100%", position: "relative" }}>
           {blocks.map((b) => (
             <Tile key={b.key} block={b} />
           ))}

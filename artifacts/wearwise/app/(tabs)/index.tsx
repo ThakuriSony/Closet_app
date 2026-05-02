@@ -51,7 +51,7 @@ const H_PADDING = 20;
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { items, addOutfit, markItemsWorn } = useWardrobe();
+  const { items, addOutfit, markItemsWorn, getItem } = useWardrobe();
   const {
     name,
     dirtyThreshold,
@@ -221,6 +221,25 @@ export default function HomeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [occasion]);
 
+  // Re-hydrate the outfit's item slots from the live context items so that
+  // processedImageUri updates (which arrive after the initial generate) are
+  // always reflected in the preview without needing a full re-generate.
+  const liveOutfit = useMemo(() => {
+    if (!outfit) return null;
+    const hydrate = (item: typeof outfit.top) =>
+      item ? (getItem(item.id) ?? item) : item;
+    return {
+      ...outfit,
+      top: hydrate(outfit.top),
+      bottom: hydrate(outfit.bottom),
+      shoes: hydrate(outfit.shoes),
+      outerwear: hydrate(outfit.outerwear),
+      accessories: (outfit.accessories ?? []).map(
+        (a) => getItem(a.id) ?? a,
+      ),
+    };
+  }, [outfit, items, getItem]);
+
   const outfitItemIds = useMemo(() => {
     if (!outfit) return [] as string[];
     return [outfit.top, outfit.bottom, outfit.shoes, outfit.outerwear]
@@ -333,7 +352,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <OutfitPreview outfit={outfit} />
+        <OutfitPreview outfit={liveOutfit} />
 
         {noCleanItems ? (
           <View
