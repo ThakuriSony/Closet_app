@@ -1,7 +1,7 @@
 const colors = {
   light: {
     text: "#111111",
-    tint: "#4282AA",
+    tint: "#003631",
 
     background: "#FFFFFF",
     foreground: "#111111",
@@ -9,8 +9,8 @@ const colors = {
     card: "#FFFFFF",
     cardForeground: "#111111",
 
-    primary: "#4282AA",
-    primaryForeground: "#FFFFFF",
+    primary: "#003631",
+    primaryForeground: "#FFEDA8",
 
     secondary: "#F7F7F5",
     secondaryForeground: "#111111",
