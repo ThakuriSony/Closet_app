@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -19,14 +20,17 @@ export default function AvatarPreviewScreen() {
   const insets = useSafeAreaInsets();
   const { avatar, updateAvatar } = useAvatar();
 
-  const config = avatar.avatar_config;
+  const config        = avatar.avatar_config;
+  const thumbnailUrl  = avatar.avatar_thumbnail_url;
+  const provider      = avatar.avatar_provider;
+  const isPhotoreal   = provider === "avatarsdk" && !!thumbnailUrl;
 
   const handleConfirm = async () => {
     await updateAvatar({ avatar_status: "confirmed" });
     router.dismiss(2);
   };
 
-  const handleAdjust = async () => {
+  const handleAdjust = () => {
     router.back();
   };
 
@@ -41,6 +45,14 @@ export default function AvatarPreviewScreen() {
         <Text style={[styles.title, { color: colors.foreground }]}>
           Your avatar is ready
         </Text>
+        {isPhotoreal && (
+          <View style={styles.providerBadge}>
+            <Feather name="zap" size={11} color={colors.primary} />
+            <Text style={[styles.providerText, { color: colors.primary }]}>
+              Photoreal · Avatar SDK
+            </Text>
+          </View>
+        )}
       </View>
 
       <ScrollView
@@ -53,8 +65,27 @@ export default function AvatarPreviewScreen() {
         <View
           style={[styles.avatarStage, { backgroundColor: colors.secondary }]}
         >
-          {config ? (
-            <AvatarRenderer config={config} size={220} />
+          {isPhotoreal ? (
+            /* ── Photoreal thumbnail (Avatar SDK) ── */
+            <Image
+              source={{ uri: thumbnailUrl! }}
+              style={styles.thumbnail}
+              contentFit="contain"
+              transition={300}
+            />
+          ) : config ? (
+            /* ── SVG mannequin fallback ── */
+            <>
+              <AvatarRenderer config={config} size={220} />
+              {provider === "demo" && (
+                <View style={[styles.demoChip, { backgroundColor: colors.muted }]}>
+                  <Feather name="info" size={11} color={colors.mutedForeground} />
+                  <Text style={[styles.demoChipText, { color: colors.mutedForeground }]}>
+                    Using simplified avatar preview
+                  </Text>
+                </View>
+              )}
+            </>
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Feather name="user" size={64} color={colors.mutedForeground} />
@@ -79,8 +110,9 @@ export default function AvatarPreviewScreen() {
         </View>
 
         <Text style={[styles.trustCopy, { color: colors.mutedForeground }]}>
-          This is a stylized avatar to help visualize fit and proportion.
-          You can update or delete it anytime.
+          {isPhotoreal
+            ? "This is a photorealistic avatar generated from your photo. No facial data is stored permanently."
+            : "This is a stylized avatar based on your body measurements. You can update or delete it anytime."}
         </Text>
 
         <Pressable
@@ -141,11 +173,22 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
+    gap: 6,
   },
   title: {
     fontSize: 22,
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.3,
+  },
+  providerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  providerText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.2,
   },
   content: {
     paddingHorizontal: 20,
@@ -160,12 +203,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     minHeight: 340,
+    gap: 16,
+  },
+  thumbnail: {
+    width: 220,
+    height: 320,
+    borderRadius: 12,
   },
   avatarPlaceholder: {
     width: 140,
     height: 280,
     alignItems: "center",
     justifyContent: "center",
+  },
+  demoChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  demoChipText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
   },
   summaryRow: {
     flexDirection: "row",

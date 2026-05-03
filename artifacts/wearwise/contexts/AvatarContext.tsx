@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 
-const AVATAR_KEY = "wearwise:avatar:v1";
+const AVATAR_KEY = "wearwise:avatar:v2";
 
 export interface AvatarConfig {
   skinToneHex: string;
@@ -28,6 +28,11 @@ export interface AvatarData {
   face_photo_url: string | null;
   avatar_status: "not_started" | "setup_complete" | "confirmed";
   avatar_config: AvatarConfig | null;
+  // Photoreal avatar fields (populated once Avatar SDK credentials are added)
+  avatar_provider: "demo" | "avatarsdk" | null;
+  avatar_model_url: string | null;
+  avatar_thumbnail_url: string | null;
+  avatar_computation_id: string | null;
 }
 
 const DEFAULT: AvatarData = {
@@ -41,6 +46,10 @@ const DEFAULT: AvatarData = {
   face_photo_url: null,
   avatar_status: "not_started",
   avatar_config: null,
+  avatar_provider: null,
+  avatar_model_url: null,
+  avatar_thumbnail_url: null,
+  avatar_computation_id: null,
 };
 
 interface AvatarContextValue {
@@ -48,6 +57,7 @@ interface AvatarContextValue {
   loading: boolean;
   updateAvatar: (changes: Partial<AvatarData>) => Promise<void>;
   clearFacePhoto: () => Promise<void>;
+  resetAvatar: () => Promise<void>;
 }
 
 const AvatarContext = createContext<AvatarContextValue | null>(null);
@@ -65,7 +75,7 @@ export function AvatarProvider({ children }: { children: React.ReactNode }) {
           setAvatar({ ...DEFAULT, ...parsed });
         }
       } catch {
-        // ignore
+        // ignore parse errors
       } finally {
         setLoading(false);
       }
@@ -90,9 +100,13 @@ export function AvatarProvider({ children }: { children: React.ReactNode }) {
     await persist(next);
   }, [avatar, persist]);
 
+  const resetAvatar = useCallback(async () => {
+    await persist(DEFAULT);
+  }, [persist]);
+
   const value = useMemo<AvatarContextValue>(
-    () => ({ avatar, loading, updateAvatar, clearFacePhoto }),
-    [avatar, loading, updateAvatar, clearFacePhoto],
+    () => ({ avatar, loading, updateAvatar, clearFacePhoto, resetAvatar }),
+    [avatar, loading, updateAvatar, clearFacePhoto, resetAvatar],
   );
 
   return (

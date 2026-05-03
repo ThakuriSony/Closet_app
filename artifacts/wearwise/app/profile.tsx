@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AvatarRenderer } from "@/components/AvatarRenderer";
 import { useAvatar } from "@/contexts/AvatarContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useColors } from "@/hooks/useColors";
@@ -227,19 +229,48 @@ export default function ProfileScreen() {
           { backgroundColor: colors.card, borderColor: colors.border },
         ]}
       >
-        <Text style={[styles.label, { color: colors.foreground }]}>
-          Virtual Avatar
-        </Text>
-        <Text style={[styles.value, { color: colors.mutedForeground }]}>
-          {avatar.avatar_status === "setup_complete"
-            ? "Avatar setup complete"
-            : "Not created yet"}
-        </Text>
+        {/* Avatar mini-preview */}
+        {(avatar.avatar_status === "confirmed" || avatar.avatar_status === "setup_complete") && (
+          <View style={styles.avatarPreviewRow}>
+            <View style={[styles.avatarThumbWrap, { backgroundColor: colors.secondary }]}>
+              {avatar.avatar_provider === "avatarsdk" && avatar.avatar_thumbnail_url ? (
+                <Image
+                  source={{ uri: avatar.avatar_thumbnail_url }}
+                  style={styles.avatarThumbImg}
+                  contentFit="contain"
+                />
+              ) : avatar.avatar_config ? (
+                <AvatarRenderer config={avatar.avatar_config} size={64} />
+              ) : (
+                <Feather name="user" size={28} color={colors.mutedForeground} />
+              )}
+            </View>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={[styles.label, { color: colors.foreground }]}>
+                Virtual Avatar
+              </Text>
+              <Text style={[styles.value, { color: colors.mutedForeground }]}>
+                {avatar.avatar_status === "confirmed" ? "Confirmed" : "Ready for review"}
+                {avatar.avatar_provider === "avatarsdk" ? " · Photoreal" : " · Stylized"}
+              </Text>
+              {avatar.skin_tone || avatar.face_shape ? (
+                <Text style={[styles.helper, { color: colors.mutedForeground }]}>
+                  {[avatar.skin_tone, avatar.face_shape].filter(Boolean).join(" · ")}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        )}
 
-        {avatar.avatar_status !== "setup_complete" && (
-          <Text style={[styles.helper, { color: colors.mutedForeground }]}>
-            Optional. Helps visualize how outfits fit your body.
-          </Text>
+        {!(avatar.avatar_status === "confirmed" || avatar.avatar_status === "setup_complete") && (
+          <>
+            <Text style={[styles.label, { color: colors.foreground }]}>
+              Virtual Avatar
+            </Text>
+            <Text style={[styles.helper, { color: colors.mutedForeground }]}>
+              Optional. Helps visualize how outfits fit your body.
+            </Text>
+          </>
         )}
 
         <Pressable
@@ -254,18 +285,18 @@ export default function ProfileScreen() {
           ]}
         >
           <Feather
-            name={avatar.avatar_status === "setup_complete" ? "edit-2" : "user"}
+            name={avatar.avatar_status !== "not_started" ? "edit-2" : "user"}
             size={14}
             color={colors.primaryForeground}
           />
           <Text style={[styles.saveLabel, { color: colors.primaryForeground }]}>
-            {avatar.avatar_status === "setup_complete"
-              ? "Edit avatar details"
+            {avatar.avatar_status !== "not_started"
+              ? "Edit avatar"
               : "Create my avatar"}
           </Text>
         </Pressable>
 
-        {avatar.avatar_status === "setup_complete" && avatar.face_photo_url ? (
+        {avatar.avatar_status !== "not_started" && avatar.face_photo_url ? (
           <Pressable
             onPress={() => void clearFacePhoto()}
             style={({ pressed }) => [
@@ -405,5 +436,24 @@ const styles = StyleSheet.create({
   deletePhotoText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
+  },
+  avatarPreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginBottom: 4,
+  },
+  avatarThumbWrap: {
+    width: 72,
+    height: 96,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    flexShrink: 0,
+  },
+  avatarThumbImg: {
+    width: 72,
+    height: 96,
   },
 });

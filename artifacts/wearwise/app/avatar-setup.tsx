@@ -19,6 +19,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { computeAvatarConfig } from "@/components/AvatarRenderer";
 import { useAvatar } from "@/contexts/AvatarContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  generateAvatar,
+  type GenerationProgress,
+} from "@/services/avatarSDKService";
 
 const TOTAL_STEPS = 7;
 const ITEM_H = 56;
@@ -238,21 +242,52 @@ export default function AvatarSetupScreen() {
     goNext();
   };
 
+  const [genProgress, setGenProgress] = useState<GenerationProgress>({
+    status: "idle",
+    message: "Preparing your avatar…",
+    pct: 0,
+  });
+  const [genError, setGenError] = useState<string | null>(null);
+
+  const runGeneration = async () => {
+    setGenError(null);
+    setGenProgress({ status: "uploading", message: "Preparing your avatar…", pct: 5 });
+
+    try {
+      const config = computeAvatarConfig(
+        avatar.height_value,
+        avatar.height_unit,
+        avatar.weight_value,
+        avatar.weight_unit,
+        avatar.skin_tone,
+        avatar.face_shape,
+      );
+
+      const result = await generateAvatar(
+        avatar.face_photo_url,
+        (p) => setGenProgress(p),
+      );
+
+      await updateAvatar({
+        avatar_status:         "setup_complete",
+        avatar_config:         config,
+        avatar_provider:       result.provider,
+        avatar_model_url:      result.modelUrl,
+        avatar_thumbnail_url:  result.thumbnailUrl,
+        avatar_computation_id: result.computationId,
+      });
+
+      router.replace("/avatar-preview");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      setGenError(msg);
+      setGenProgress({ status: "error", message: msg, pct: 0 });
+    }
+  };
+
   useEffect(() => {
     if (step === 7) {
-      (async () => {
-        await new Promise((r) => setTimeout(r, 2500));
-        const config = computeAvatarConfig(
-          avatar.height_value,
-          avatar.height_unit,
-          avatar.weight_value,
-          avatar.weight_unit,
-          avatar.skin_tone,
-          avatar.face_shape,
-        );
-        await updateAvatar({ avatar_status: "setup_complete", avatar_config: config });
-        router.replace("/avatar-preview");
-      })();
+      void runGeneration();
     }
   }, [step]);
 
@@ -743,22 +778,95 @@ export default function AvatarSetupScreen() {
     </>
   );
 
-  const renderStep7 = () => (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 24 }}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={[styles.stepTitle, { color: colors.foreground, textAlign: "center" }]}>
-        Generating your virtual avatar
-      </Text>
-      <Text
-        style={[
-          styles.stepSub,
-          { color: colors.mutedForeground, textAlign: "center", paddingHorizontal: 24 },
-        ]}
-      >
-        Please wait a moment while we prepare your avatar.{"\n"}Please don't close this screen.
-      </Text>
-    </View>
-  );
+  const renderStep7 = () => {
+    if (genError) {
+      return (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 20, paddingHorizontal: 32 }}>
+          <View
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 36,
+              backgroundColor: "#FEE2E2",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Feather name="alert-circle" size={34} color="#DC2626" />
+          </View>
+          <Text style={[styles.stepTitle, { color: colors.foreground, textAlign: "center" }]}>
+            Generation failed
+          </Text>
+          <Text
+            style={[styles.stepSub, { color: colors.mutedForeground, textAlign: "center" }]}
+          >
+            {genError}
+          </Text>
+          <Pressable
+            onPress={() => void runGeneration()}
+            style={({ pressed }) => [
+              styles.cta,
+              { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+            ]}
+          >
+            <Text style={[styles.ctaText, { color: colors.primaryForeground }]}>Try again</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: 4 })}
+          >
+            <Text style={{ color: colors.mutedForeground, fontSize: 14, fontFamily: "Inter_500Medium" }}>
+              Go back
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    const isUploading  = genProgress.status === "uploading";
+    const isProcessing = genProgress.status === "processing";
+    const pct          = genProgress.pct;
+
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 28, paddingHorizontal: 32 }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+
+        <View style={{ width: "100%", gap: 10 }}>
+          <Text style={[styles.stepTitle, { color: colors.foreground, textAlign: "center" }]}>
+            {isUploading ? "Uploading…" : isProcessing ? "Generating your avatar" : "Preparing…"}
+          </Text>
+          <Text
+            style={[styles.stepSub, { color: colors.mutedForeground, textAlign: "center" }]}
+          >
+            {genProgress.message}
+          </Text>
+        </View>
+
+        {/* Progress bar */}
+        <View
+          style={{
+            width: "100%",
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: colors.border,
+            overflow: "hidden",
+          }}
+        >
+          <View
+            style={{
+              width: `${pct}%`,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: colors.primary,
+            }}
+          />
+        </View>
+        <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_400Regular" }}>
+          {Math.round(pct)}% complete · Please don't close this screen
+        </Text>
+      </View>
+    );
+  };
 
   const renderStep = () => {
     switch (step) {
