@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, {
@@ -11,35 +12,47 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AvatarRenderer, getBodyZones } from "@/components/AvatarRenderer";
 import { CanvasItem, CANVAS_ITEM_SIZE } from "@/components/CanvasItem";
 import { SelectItemsModal } from "@/components/SelectItemsModal";
+import { useAvatar } from "@/contexts/AvatarContext";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useColors } from "@/hooks/useColors";
-import type { LookbookItem, LookbookMeta } from "@/types";
+import type { Category, ClothingItem, LookbookItem, LookbookMeta } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface CanvasEntry {
-  id: string;     // unique per canvas slot
+  id: string;
   itemId: string;
-  x: number;      // absolute pixel position within the canvas view
+  x: number;
   y: number;
   scale: number;
-  z: number;      // paint order — higher = rendered on top
+  z: number;
 }
+
+type ViewMode = "flat" | "on_me";
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function displayUri(item: ClothingItem): string {
+  return item.processedImageUri && item.processedImageUri.length > 0
+    ? item.processedImageUri
+    : item.imageUri;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +105,82 @@ function CanvasGrid({ width, height }: { width: number; height: number }) {
 }
 
 // ---------------------------------------------------------------------------
+// Map clothing category → body zone key
+// ---------------------------------------------------------------------------
+
+function zoneKey(category: Category): keyof ReturnType<typeof getBodyZones> | null {
+  switch (category) {
+    case "Top":       return "top";
+    case "Outerwear": return "outerwear";
+    case "Bottom":    return "bottom";
+    case "Dress":     return "dress";
+    case "Shoes":     return "shoes";
+    default:          return null; // Accessories: skip for now
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Avatar prompt modal
+// ---------------------------------------------------------------------------
+
+function AvatarPromptModal({
+  visible,
+  onClose,
+  onCreate,
+  colors,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onCreate: () => void;
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.promptOverlay} onPress={onClose}>
+        <Pressable
+          style={[styles.promptCard, { backgroundColor: colors.background }]}
+          onPress={() => {}}
+        >
+          <View style={[styles.promptIconWrap, { backgroundColor: colors.secondary }]}>
+            <Feather name="user" size={28} color={colors.foreground} />
+          </View>
+          <Text style={[styles.promptTitle, { color: colors.foreground }]}>
+            Create your avatar to see outfits on you
+          </Text>
+          <Text style={[styles.promptSub, { color: colors.mutedForeground }]}>
+            Set up a stylized avatar based on your measurements and preferences.
+          </Text>
+          <Pressable
+            onPress={onCreate}
+            style={({ pressed }) => [
+              styles.promptPrimary,
+              { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+            ]}
+          >
+            <Text style={[styles.promptPrimaryText, { color: colors.primaryForeground }]}>
+              Create my avatar
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onClose}
+            style={({ pressed }) => [styles.promptSecondary, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Text style={[styles.promptSecondaryText, { color: colors.mutedForeground }]}>
+              Not now
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
@@ -99,7 +188,12 @@ export default function StudioScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { outfits, items, addOutfit, updateOutfit, getItem } = useWardrobe();
+  const { avatar } = useAvatar();
   const { id } = useLocalSearchParams<{ id?: string }>();
+
+  const [viewMode, setViewMode] = useState<ViewMode>("flat");
+  const [showAvatarPrompt, setShowAvatarPrompt] = useState(false);
+  const [onMeError, setOnMeError] = useState(false);
 
   const [canvasEntries, setCanvasEntries] = useState<CanvasEntry[]>([]);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -107,19 +201,15 @@ export default function StudioScreen() {
   const [canvasDims, setCanvasDims] = useState({ width: 0, height: 0 });
   const [saving, setSaving] = useState(false);
 
-  // Monotonically increasing z counter — each tap/import bumps it.
   const zCounterRef = useRef(0);
-  // Prevents re-applying the saved layout after the user starts editing.
   const loadedRef = useRef(false);
 
-  // Find the outfit we're editing (memoised on id only — stable across renders).
   const existingOutfit = useMemo(
     () => (id ? outfits.find((o) => o.id === id) : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [id],
   );
 
-  // Once the canvas has been measured, denormalise saved layout into absolute px.
   useEffect(() => {
     if (
       canvasDims.width === 0 ||
@@ -130,7 +220,6 @@ export default function StudioScreen() {
     loadedRef.current = true;
 
     const meta = existingOutfit.layoutMeta;
-    // Use stored canvas dimensions if available, else fall back to current.
     const cW = meta?.canvasW ?? canvasDims.width;
     const cH = meta?.canvasH ?? canvasDims.height;
 
@@ -151,6 +240,39 @@ export default function StudioScreen() {
       })),
     );
   }, [canvasDims.width, canvasDims.height, existingOutfit]);
+
+  // -------------------------------------------------------------------------
+  // View mode toggle
+  // -------------------------------------------------------------------------
+
+  const handleViewModeToggle = (mode: ViewMode) => {
+    if (mode === "on_me") {
+      if (avatar.avatar_status !== "confirmed" || !avatar.avatar_config) {
+        setShowAvatarPrompt(true);
+        return;
+      }
+      setOnMeError(false);
+    }
+    setViewMode(mode);
+  };
+
+  // -------------------------------------------------------------------------
+  // On-me: deduplicate items by category (highest-z wins per category)
+  // -------------------------------------------------------------------------
+
+  const onMeItems = useMemo<ClothingItem[]>(() => {
+    if (viewMode !== "on_me") return [];
+    const byCategory = new Map<string, { item: ClothingItem; z: number }>();
+    for (const entry of canvasEntries) {
+      const item = getItem(entry.itemId);
+      if (!item) continue;
+      const existing = byCategory.get(item.category);
+      if (!existing || entry.z > existing.z) {
+        byCategory.set(item.category, { item, z: entry.z });
+      }
+    }
+    return Array.from(byCategory.values()).map((v) => v.item);
+  }, [viewMode, canvasEntries, getItem]);
 
   // -------------------------------------------------------------------------
   // Canvas item helpers
@@ -196,7 +318,6 @@ export default function StudioScreen() {
     [],
   );
 
-  // Tap brings the item to the front by assigning the next z value.
   const handleSelect = useCallback((entryId: string) => {
     setSelectedEntryId((prev) => (prev === entryId ? null : entryId));
     zCounterRef.current += 1;
@@ -212,14 +333,13 @@ export default function StudioScreen() {
     setSelectedEntryId(null);
   };
 
-  // Render entries sorted by z so the highest z paints last (on top).
   const sortedEntries = useMemo(
     () => [...canvasEntries].sort((a, b) => a.z - b.z),
     [canvasEntries],
   );
 
   // -------------------------------------------------------------------------
-  // Save — normalise absolute px → 0–1 before storing
+  // Save
   // -------------------------------------------------------------------------
 
   const handleSave = async () => {
@@ -271,10 +391,136 @@ export default function StudioScreen() {
   };
 
   // -------------------------------------------------------------------------
-  // Render
+  // On-me render
+  // -------------------------------------------------------------------------
+
+  const renderOnMe = () => {
+    const config = avatar.avatar_config;
+    if (!config || onMeError) {
+      return (
+        <View style={[styles.canvas, { backgroundColor: "#FAF7F0", alignItems: "center", justifyContent: "center" }]}>
+          <View style={[styles.fallbackBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="alert-circle" size={14} color={colors.mutedForeground} />
+            <Text style={[styles.fallbackText, { color: colors.mutedForeground }]}>
+              Showing flat view instead
+            </Text>
+          </View>
+          {renderFlatCanvas()}
+        </View>
+      );
+    }
+
+    const avatarSize = Math.min(canvasDims.width * 0.56, 210);
+    let zones: ReturnType<typeof getBodyZones> | null = null;
+    try {
+      zones = getBodyZones(config, avatarSize);
+    } catch {
+      setOnMeError(true);
+      return null;
+    }
+
+    const avatarH = zones.avatarTotalHeight;
+    const canvasH = canvasDims.height;
+    const topPad = Math.max(16, (canvasH - avatarH) * 0.18);
+
+    return (
+      <ScrollView
+        style={[styles.canvas, { backgroundColor: "#F5F3EE" }]}
+        contentContainerStyle={[
+          styles.onMeContent,
+          { paddingTop: topPad, paddingBottom: 24 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {canvasEntries.length === 0 && (
+          <View style={styles.onMeHint} pointerEvents="none">
+            <Text style={[styles.onMeHintText, { color: colors.mutedForeground }]}>
+              Add items below to see them on your avatar
+            </Text>
+          </View>
+        )}
+
+        <View style={{ width: avatarSize, height: avatarH, position: "relative" }}>
+          {/* Avatar base */}
+          <AvatarRenderer config={config} size={avatarSize} />
+
+          {/* Clothing overlays */}
+          {onMeItems.map((item) => {
+            const key = zoneKey(item.category);
+            if (!key || !zones) return null;
+            const zone = zones[key] as { left: number; top: number; width: number; height: number };
+            return (
+              <Image
+                key={item.id}
+                source={{ uri: displayUri(item) }}
+                style={[styles.onMeCloth, zone]}
+                contentFit="contain"
+              />
+            );
+          })}
+        </View>
+
+        {canvasEntries.length > 0 && onMeItems.length === 0 && (
+          <Text style={[styles.onMeHintText, { color: colors.mutedForeground, marginTop: 12 }]}>
+            None of the added items can be shown on the avatar yet
+          </Text>
+        )}
+      </ScrollView>
+    );
+  };
+
+  // -------------------------------------------------------------------------
+  // Flat canvas render
   // -------------------------------------------------------------------------
 
   const emptyCloset = items.length === 0;
+
+  const renderFlatCanvas = () => (
+    <View
+      style={[styles.canvas, { backgroundColor: "#FAF7F0" }]}
+      onLayout={(e) =>
+        setCanvasDims({
+          width: e.nativeEvent.layout.width,
+          height: e.nativeEvent.layout.height,
+        })
+      }
+    >
+      <CanvasGrid width={canvasDims.width} height={canvasDims.height} />
+
+      <Pressable
+        style={StyleSheet.absoluteFillObject}
+        onPress={() => setSelectedEntryId(null)}
+      />
+
+      {sortedEntries.map((entry) => {
+        const item = getItem(entry.itemId);
+        if (!item) return null;
+        return (
+          <CanvasItem
+            key={entry.id}
+            entryId={entry.id}
+            item={item}
+            initialX={entry.x}
+            initialY={entry.y}
+            initialScale={entry.scale}
+            isSelected={selectedEntryId === entry.id}
+            onSelect={handleSelect}
+            onMove={handleMove}
+          />
+        );
+      })}
+
+      {canvasEntries.length === 0 && emptyCloset && (
+        <View style={styles.hint} pointerEvents="none">
+          <Text style={styles.hintText}>Add items to your Closet first</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -298,9 +544,7 @@ export default function StudioScreen() {
         </Text>
 
         <Pressable
-          onPress={() => {
-            void handleSave();
-          }}
+          onPress={() => { void handleSave(); }}
           disabled={saving}
           style={({ pressed }) => [
             styles.saveBtn,
@@ -317,49 +561,57 @@ export default function StudioScreen() {
         </Pressable>
       </View>
 
-      {/* Canvas */}
+      {/* View mode segmented toggle */}
       <View
-        style={[styles.canvas, { backgroundColor: "#FAF7F0" }]}
-        onLayout={(e) =>
-          setCanvasDims({
-            width: e.nativeEvent.layout.width,
-            height: e.nativeEvent.layout.height,
-          })
-        }
+        style={[
+          styles.toggleRow,
+          { backgroundColor: colors.background, borderBottomColor: colors.border },
+        ]}
       >
-        <CanvasGrid width={canvasDims.width} height={canvasDims.height} />
+        <View style={[styles.togglePill, { backgroundColor: colors.secondary }]}>
+          {(["flat", "on_me"] as ViewMode[]).map((mode) => {
+            const active = viewMode === mode;
+            return (
+              <Pressable
+                key={mode}
+                onPress={() => handleViewModeToggle(mode)}
+                style={({ pressed }) => [
+                  styles.toggleSeg,
+                  active && { backgroundColor: colors.primary, borderRadius: 999 },
+                  { opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.toggleLabel,
+                    {
+                      color: active
+                        ? colors.primaryForeground
+                        : colors.mutedForeground,
+                    },
+                  ]}
+                >
+                  {mode === "flat" ? "Flat view" : "On me"}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
-        {/* Tap blank canvas area to deselect */}
-        <Pressable
-          style={StyleSheet.absoluteFillObject}
-          onPress={() => setSelectedEntryId(null)}
-        />
-
-        {/* Items rendered in z-order (lowest z first, highest z on top) */}
-        {sortedEntries.map((entry) => {
-          const item = getItem(entry.itemId);
-          if (!item) return null;
-          return (
-            <CanvasItem
-              key={entry.id}
-              entryId={entry.id}
-              item={item}
-              initialX={entry.x}
-              initialY={entry.y}
-              initialScale={entry.scale}
-              isSelected={selectedEntryId === entry.id}
-              onSelect={handleSelect}
-              onMove={handleMove}
-            />
-          );
-        })}
-
-        {/* Closet-empty hint (only when canvas is empty) */}
-        {canvasEntries.length === 0 && emptyCloset && (
-          <View style={styles.hint} pointerEvents="none">
-            <Text style={styles.hintText}>Add items to your Closet first</Text>
-          </View>
-        )}
+      {/* Canvas area — measure once for the flat layout ref */}
+      <View
+        style={{ flex: 1 }}
+        onLayout={(e) => {
+          if (viewMode === "on_me") {
+            setCanvasDims({
+              width: e.nativeEvent.layout.width,
+              height: e.nativeEvent.layout.height,
+            });
+          }
+        }}
+      >
+        {viewMode === "flat" ? renderFlatCanvas() : renderOnMe()}
       </View>
 
       {/* Bottom action bar */}
@@ -375,21 +627,34 @@ export default function StudioScreen() {
       >
         <Pressable
           onPress={handleDeleteSelected}
-          disabled={!selectedEntryId}
+          disabled={!selectedEntryId || viewMode === "on_me"}
           hitSlop={10}
           style={({ pressed }) => [
             styles.barIcon,
-            { opacity: selectedEntryId ? (pressed ? 0.5 : 1) : 0.25 },
+            {
+              opacity:
+                selectedEntryId && viewMode === "flat"
+                  ? pressed ? 0.5 : 1
+                  : 0.25,
+            },
           ]}
         >
           <Feather
             name="trash-2"
             size={22}
-            color={selectedEntryId ? colors.foreground : colors.mutedForeground}
+            color={
+              selectedEntryId && viewMode === "flat"
+                ? colors.foreground
+                : colors.mutedForeground
+            }
           />
         </Pressable>
 
-        {selectedEntryId ? (
+        {viewMode === "on_me" ? (
+          <Text style={[styles.barHint, { color: colors.mutedForeground }]}>
+            See how this outfit fits your body
+          </Text>
+        ) : selectedEntryId ? (
           <Text style={[styles.barHint, { color: colors.mutedForeground }]}>
             Item selected
           </Text>
@@ -424,9 +689,23 @@ export default function StudioScreen() {
         onClose={() => setShowPicker(false)}
         onImport={handleImport}
       />
+
+      <AvatarPromptModal
+        visible={showAvatarPrompt}
+        onClose={() => setShowAvatarPrompt(false)}
+        onCreate={() => {
+          setShowAvatarPrompt(false);
+          router.push("/avatar-setup");
+        }}
+        colors={colors}
+      />
     </View>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
@@ -456,6 +735,27 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
 
+  toggleRow: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+  },
+  togglePill: {
+    flexDirection: "row",
+    borderRadius: 999,
+    padding: 3,
+    gap: 2,
+  },
+  toggleSeg: {
+    paddingHorizontal: 20,
+    paddingVertical: 7,
+  },
+  toggleLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+
   canvas: {
     flex: 1,
     overflow: "hidden",
@@ -470,6 +770,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_500Medium",
     color: "rgba(0,0,0,0.28)",
+  },
+
+  onMeContent: {
+    alignItems: "center",
+    flexGrow: 1,
+  },
+  onMeHint: {
+    position: "absolute",
+    bottom: -36,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  onMeHintText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
+  },
+  onMeCloth: {
+    position: "absolute",
+  },
+
+  fallbackBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 12,
+  },
+  fallbackText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
   },
 
   bar: {
@@ -498,5 +833,59 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  promptOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  promptCard: {
+    width: "100%",
+    borderRadius: 20,
+    padding: 28,
+    alignItems: "center",
+    gap: 12,
+  },
+  promptIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  promptTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  promptSub: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 8,
+  },
+  promptPrimary: {
+    width: "100%",
+    paddingVertical: 15,
+    borderRadius: 999,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  promptPrimaryText: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+  },
+  promptSecondary: {
+    paddingVertical: 8,
+  },
+  promptSecondaryText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
   },
 });

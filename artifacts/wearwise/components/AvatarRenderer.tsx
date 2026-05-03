@@ -1,7 +1,7 @@
 import React from "react";
 import Svg, { Ellipse, Path, Rect } from "react-native-svg";
 
-const SKIN_TONE_HEX: Record<string, string> = {
+export const SKIN_TONE_HEX: Record<string, string> = {
   Ivory: "#FDEBD6",
   Sand: "#F0C99A",
   Honey: "#D4956A",
@@ -157,6 +157,72 @@ export function AvatarRenderer({ config, size = 280 }: Props) {
       />
     </Svg>
   );
+}
+
+export interface BodyZones {
+  top: { left: number; top: number; width: number; height: number };
+  bottom: { left: number; top: number; width: number; height: number };
+  dress: { left: number; top: number; width: number; height: number };
+  outerwear: { left: number; top: number; width: number; height: number };
+  shoes: { left: number; top: number; width: number; height: number };
+  avatarTotalHeight: number;
+}
+
+export function getBodyZones(config: AvatarConfig, renderWidth: number): BodyZones {
+  const VW = 200;
+  const scale = renderWidth / VW;
+  const { widthFactor, heightFactor, faceShape } = config;
+
+  const [, headRy] = headDims(faceShape);
+
+  const shoulderHW = 42 + widthFactor * 22;
+  const hipHW      = 34 + widthFactor * 20;
+
+  const headCy    = 66;
+  const neckTop   = headCy + headRy - 4;
+  const neckBot   = neckTop + 22;
+  const shoulderY = neckBot + 4;
+  const waistY    = shoulderY + 90;
+  const hipBot    = waistY + 26;
+  const legEnd    = hipBot + 128 + heightFactor * 52;
+  const totalH    = legEnd + 18;
+
+  const cx = 100;
+  const s = (v: number) => v * scale;
+
+  return {
+    top: {
+      left: s(cx - shoulderHW),
+      top: s(shoulderY),
+      width: s(shoulderHW * 2),
+      height: s(waistY - shoulderY + 8),
+    },
+    outerwear: {
+      left: s(cx - shoulderHW - 5),
+      top: s(shoulderY - 4),
+      width: s((shoulderHW + 5) * 2),
+      height: s(waistY - shoulderY + 14),
+    },
+    bottom: {
+      left: s(cx - hipHW),
+      top: s(hipBot),
+      width: s(hipHW * 2),
+      height: s(legEnd - hipBot),
+    },
+    dress: {
+      left: s(cx - shoulderHW),
+      top: s(shoulderY),
+      width: s(shoulderHW * 2),
+      height: s(legEnd - shoulderY),
+    },
+    shoes: {
+      left: s(cx - hipHW * 0.82),
+      top: s(legEnd - 10),
+      width: s(hipHW * 1.64),
+      height: s(32),
+    },
+    avatarTotalHeight: s(totalH),
+  };
 }
 
 export function computeAvatarConfig(

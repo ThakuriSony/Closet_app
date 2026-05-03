@@ -1,0 +1,174 @@
+You are a senior product engineer implementing PHASE 3
+of the Avatar feature in the Wearwise app.
+
+THIS PROMPT ONLY COVERS:
+- Using the existing avatar to visualize outfits
+- Inside the Outfit Generator / Studio screen only
+- With a user-controlled toggle
+
+DO NOT:
+- Show avatar on the Home tab
+- Force avatar usage
+- Change outfit generation logic
+- Add AR or camera-based try on
+
+------------------------------------------------------------
+1) WHERE AVATAR IS USED (STRICT)
+
+Avatar visualization must appear ONLY in:
+- Outfit Generator / Studio
+
+Avatar must be:
+- Optional
+- User-controlled
+- OFF by default
+
+DO NOT surface avatar anywhere else.
+
+------------------------------------------------------------
+2) TOGGLE — USER IN CONTROL
+
+At the top of the Studio / Outfit Generator screen,
+add a segmented toggle:
+
+[ Flat view ]   [ On me ]
+
+Default state:
+✅ Flat view
+
+Behavior:
+- Flat view = existing outfit cards / layout
+- On me = render outfit on the user’s avatar
+
+Remember:
+User is always in control — never auto-switch.
+
+------------------------------------------------------------
+3) PREREQUISITE CHECK
+
+If user taps “On me” and avatar is NOT created:
+
+Show a gentle prompt:
+
+Title:
+"Create your avatar to see outfits on you"
+
+Buttons:
+Primary:
+"Create my avatar"
+
+Secondary:
+"Not now"
+
+Do NOT block the user from using Flat view.
+
+------------------------------------------------------------
+4) AVATAR OUTFIT VISUALIZATION LOGIC
+
+When "On me" is active:
+
+- Render the user’s confirmed avatar
+- Overlay selected outfit items onto the avatar
+
+Clothing rendering rules:
+- Clothes must scale based on avatar height and proportions
+- Respect body silhouette (no clipping)
+- Maintain original outfit structure rules:
+  - Dress-only OR Top + Bottom
+  - Shoes optional visual element
+- No accessories layering yet (can be added later)
+
+Clothing visualization focus:
+✅ Fit & proportion
+✅ Length (especially dresses and pants)
+✅ Overall silhouette
+
+NO:
+- Fabric physics
+- Realistic wrinkles
+- Pose changes
+- Rotation
+
+------------------------------------------------------------
+5) VISUAL DESIGN
+
+Avatar pose:
+- Neutral
+- Front-facing
+- Still
+
+Background:
+- Neutral (off-white / studio tone)
+
+Clothes should be:
+- Slightly muted
+- Not overly photo-real
+- Consistent with stylized avatar aesthetic
+
+------------------------------------------------------------
+6) INTERACTION BEHAVIOR
+
+User can:
+- Switch back to Flat view anytime
+- Generate new outfits while in On me view
+- See avatar update instantly with new outfit
+
+Do NOT:
+- Ask for confirmation every time
+- Lock them into one mode
+
+------------------------------------------------------------
+7) PERFORMANCE & FAIL SAFES
+
+If avatar rendering fails:
+- Fallback gracefully to Flat view
+- Show small inline message:
+  "Showing flat view instead"
+
+Never crash the Studio.
+
+------------------------------------------------------------
+8) DATA & STATE
+
+Do NOT modify avatar data here.
+Do NOT store outfit screenshots yet.
+
+Only consume:
+- avatar_id
+- avatar_render_config
+- selected_outfit_items
+
+------------------------------------------------------------
+9) COPY & TONE (IMPORTANT)
+
+Use supportive, non-AI language.
+
+Examples:
+- Toggle label: “On me”
+- Helper text (optional):
+  “See how this outfit fits your body”
+
+Avoid:
+- “AI try-on”
+- “Digital twin”
+- “Prediction”
+
+------------------------------------------------------------
+10) HARD CONSTRAINTS
+
+DO NOT:
+- Enable avatar by default
+- Use camera or live video
+- Mention accuracy guarantees
+- Call this a final fit simulator
+
+This is a visual aid, not a tailoring tool.
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Studio toggle implementation
+2) Avatar + outfit rendering logic
+3) Prerequisite avatar prompt
+4) Graceful fallback handling
+
+STOP IMPLEMENTATION AFTER THIS PHASE.
