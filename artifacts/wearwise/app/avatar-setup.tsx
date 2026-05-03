@@ -194,6 +194,7 @@ export default function AvatarSetupScreen() {
   const [weightLbIdx, setWeightLbIdx] = useState(64);
 
   const [faceShape, setFaceShape] = useState<string | null>(avatar.face_shape);
+  const [undertone, setUndertone] = useState<string | null>(avatar.undertone);
   const [skinTone, setSkinTone] = useState<string | null>(avatar.skin_tone);
   const [facePhoto, setFacePhoto] = useState<string | null>(avatar.face_photo_url);
 
@@ -515,28 +516,47 @@ export default function AvatarSetupScreen() {
             desc: "A balanced mix of cool and warm. Most colour palettes work well.",
             vein: "Veins appear blue-green.",
           },
-        ].map(({ label, emoji, desc, vein }) => (
-          <View
-            key={label}
-            style={[
-              styles.undertoneCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <Text style={styles.undertoneEmoji}>{emoji}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.undertoneName, { color: colors.foreground }]}>{label}</Text>
-              <Text style={[styles.undertoneDesc, { color: colors.mutedForeground }]}>{desc}</Text>
-              <Text style={[styles.undertoneVein, { color: colors.mutedForeground }]}>
-                💡 {vein}
-              </Text>
-            </View>
-          </View>
-        ))}
+        ].map(({ label, emoji, desc, vein }) => {
+          const isSel = undertone === label;
+          return (
+            <Pressable
+              key={label}
+              onPress={() => setUndertone(label)}
+              style={({ pressed }) => [
+                styles.undertoneCard,
+                {
+                  backgroundColor: isSel ? colors.primary : colors.card,
+                  borderColor: isSel ? colors.primary : colors.border,
+                  borderWidth: isSel ? 1.5 : StyleSheet.hairlineWidth,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Text style={styles.undertoneEmoji}>{emoji}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.undertoneName, { color: isSel ? colors.primaryForeground : colors.foreground }]}>
+                  {label}
+                </Text>
+                <Text style={[styles.undertoneDesc, { color: isSel ? colors.primaryForeground : colors.mutedForeground, opacity: isSel ? 0.9 : 1 }]}>
+                  {desc}
+                </Text>
+                <Text style={[styles.undertoneVein, { color: isSel ? colors.primaryForeground : colors.mutedForeground, opacity: isSel ? 0.8 : 1 }]}>
+                  💡 {vein}
+                </Text>
+              </View>
+              {isSel ? (
+                <Feather name="check-circle" size={20} color={colors.primaryForeground} />
+              ) : null}
+            </Pressable>
+          );
+        })}
         <View style={{ height: 16 }} />
       </ScrollView>
       <Pressable
-        onPress={goNext}
+        onPress={async () => {
+          if (undertone) await updateAvatar({ undertone });
+          goNext();
+        }}
         style={({ pressed }) => [
           styles.cta,
           { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
