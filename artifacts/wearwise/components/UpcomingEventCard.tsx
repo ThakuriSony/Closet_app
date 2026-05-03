@@ -47,7 +47,7 @@ export function UpcomingEventCard({ event, onGenerate }: Props) {
       >
         <Feather name="zap" size={14} color={colors.primaryForeground} />
         <Text style={[styles.btnLabel, { color: colors.primaryForeground }]}>
-          Generate Outfit
+          Create looks
         </Text>
       </Pressable>
     </View>

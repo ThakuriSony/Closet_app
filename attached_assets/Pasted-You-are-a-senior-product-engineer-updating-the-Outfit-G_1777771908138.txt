@@ -1,0 +1,126 @@
+You are a senior product engineer updating the Outfit Generator experience
+in the Wearwise app.
+
+GOAL:
+1) Replace AI-centered language with empowering, user-first language
+2) Add a simple outfit feedback mechanism that feels like the user is teaching their style,
+   not rating or correcting AI
+
+IMPORTANT PRINCIPLE:
+The AI must feel like a stylist assistant that offers options.
+The user must feel in control at all times.
+
+------------------------------------------------------------
+1) COPY & LANGUAGE UPDATE (CRITICAL)
+
+Replace all occurrences of:
+- “Generate Outfit”
+- “AI Suggestion”
+- “Recommended Outfit”
+
+WITH:
+
+Primary CTA button:
+✅ “Create looks”
+
+Supporting microcopy (small text under button or section header):
+- “You’re in control — these are just ideas.”
+OR
+- “Pick, tweak, or skip. Totally up to you.”
+
+DO NOT use:
+- “AI”
+- “Generated”
+- “Recommended”
+
+------------------------------------------------------------
+2) MULTIPLE LOOKS CONTEXT (FRAMING)
+
+When showing the outfit carousel:
+Use section title:
+✅ “A few looks you can choose from”
+
+This reinforces:
+- choice
+- control
+- non-authoritative suggestions
+
+------------------------------------------------------------
+3) ADD USER FEEDBACK (OPTION A — EMPOWERING VERSION)
+
+Show feedback ONLY after looks are created.
+
+Placement:
+- Below the outfit carousel
+- Near “Why this works” or explanation text
+
+Copy (VERY IMPORTANT — tone):
+
+Instead of:
+❌ “Rate this outfit”
+❌ “Was this a good suggestion?”
+
+Use:
+✅ “Want more looks like this?”
+
+Buttons:
+👍 “More like this”
+👎 “Less like this”
+
+This language frames feedback as:
+- shaping future looks
+- expressing preference
+- user-driven direction
+
+------------------------------------------------------------
+4) FEEDBACK BEHAVIOR
+
+On tap:
+- Save feedback with:
+  - outfitId
+  - userId
+  - preference: “more” | “less”
+  - occasion / context
+  - tags used
+- Show subtle confirmation text:
+  ✅ “Got it — we’ll follow your lead.”
+
+Rules:
+- Feedback is OPTIONAL
+- Feedback can be given once per outfit
+- No modal
+- No explanation required
+
+------------------------------------------------------------
+5) WHAT NOT TO DO (IMPORTANT)
+
+DO NOT:
+- Ask users to explain why
+- Show star ratings
+- Mention “training the AI”
+- Prompt repeatedly for feedback
+- Show feedback controls for manual Studio-created looks
+
+------------------------------------------------------------
+6) VISUAL / UX NOTES
+
+- Feedback UI should feel quiet and optional
+- Icons slightly muted
+- No success toast, just inline acknowledgment
+- Once feedback is given, disable or fade the buttons
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Updated CTA copy (“Create looks”)
+2) Updated section headers
+3) Feedback UI component with empowering copy
+4) Feedback storage logic (simple, extensible)
+5) Confirmation microcopy
+
+CONSTRAINTS:
+- No new screens
+- No redesign
+- No technical ML language
+- Keep the human in control
+
+Start implementing now.

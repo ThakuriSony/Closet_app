@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -91,6 +92,7 @@ export default function HomeScreen() {
   const [explaining, setExplaining] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [wornIndices, setWornIndices] = useState<Set<number>>(new Set());
+  const [feedback, setFeedback] = useState<Record<number, "more" | "less">>({});
   const [prefsModalOpen, setPrefsModalOpen] = useState<boolean>(false);
 
   const carouselRef = useRef<FlatList<GenerateOutfitResult>>(null);
@@ -217,6 +219,7 @@ export default function HomeScreen() {
       setOutfits(results);
       setSelectedIndex(0);
       setWornIndices(new Set());
+      setFeedback({});
       carouselRef.current?.scrollToIndex({ index: 0, animated: false });
 
       const occForExplain: Occasion = overrideCategory
@@ -226,6 +229,38 @@ export default function HomeScreen() {
       triggerExplanations(results, occForExplain, weatherForGen);
     },
     [items, occasion, weather, eventOverride, effectiveOccasion, triggerExplanations],
+  );
+
+  const onGiveFeedback = useCallback(
+    async (index: number, pref: "more" | "less") => {
+      setFeedback((prev) => ({ ...prev, [index]: pref }));
+      const outfit = outfits[index];
+      if (!outfit) return;
+      const tags = [outfit.top, outfit.bottom, outfit.shoes, outfit.outerwear]
+        .filter(Boolean)
+        .flatMap((item) => item!.tags);
+      const entry = {
+        itemIds: [outfit.top, outfit.bottom, outfit.shoes, outfit.outerwear]
+          .filter(Boolean)
+          .map((i) => i!.id),
+        preference: pref,
+        occasion: effectiveOccasion,
+        tags,
+        timestamp: Date.now(),
+      };
+      try {
+        const raw = await AsyncStorage.getItem("wearwise:outfit-feedback:v1");
+        const list: typeof entry[] = raw ? (JSON.parse(raw) as typeof entry[]) : [];
+        list.push(entry);
+        await AsyncStorage.setItem(
+          "wearwise:outfit-feedback:v1",
+          JSON.stringify(list),
+        );
+      } catch {
+        // Non-critical — feedback stored in state regardless
+      }
+    },
+    [outfits, effectiveOccasion],
   );
 
   const onGenerateForEvent = useCallback(() => {
@@ -366,7 +401,9 @@ export default function HomeScreen() {
           <OccasionTabs value={occasion} onChange={setOccasion} />
         )}
 
-        <SectionLabel>Today's Outfit</SectionLabel>
+        <SectionLabel>
+          {outfits.length > 0 ? "A few looks you can choose from" : "Today's Look"}
+        </SectionLabel>
 
         {items.length < 3 ? (
           <View
@@ -379,7 +416,7 @@ export default function HomeScreen() {
             <Text
               style={[styles.noticeText, { color: colors.mutedForeground }]}
             >
-              Add more items to get better outfit suggestions.
+              Add more items to get a full look.
             </Text>
           </View>
         ) : null}
@@ -510,6 +547,14 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
+        {/* ── Feedback ─────────────────────────────────────────────────── */}
+        {isOutfitComplete ? (
+          <OutfitFeedback
+            given={feedback[selectedIndex] ?? null}
+            onFeedback={(pref) => void onGiveFeedback(selectedIndex, pref)}
+          />
+        ) : null}
+
         {/* ── Action buttons ───────────────────────────────────────────── */}
         <Pressable
           onPress={() => generate()}
@@ -531,7 +576,7 @@ export default function HomeScreen() {
           <Text
             style={[styles.generateLabel, { color: colors.primaryForeground }]}
           >
-            {outfits.length > 0 ? "Regenerate Outfits" : "Generate Outfit"}
+            {outfits.length > 0 ? "New looks" : "Create looks"}
           </Text>
         </Pressable>
 
@@ -615,6 +660,64 @@ export default function HomeScreen() {
           setPrefsModalOpen(false);
         }}
       />
+    </View>
+  );
+}
+
+function OutfitFeedback({
+  given,
+  onFeedback,
+}: {
+  given: "more" | "less" | null;
+  onFeedback: (pref: "more" | "less") => void;
+}) {
+  const colors = useColors();
+
+  if (given) {
+    return (
+      <Text style={[styles.feedbackConfirm, { color: colors.mutedForeground }]}>
+        Got it — we'll follow your lead.
+      </Text>
+    );
+  }
+
+  return (
+    <View style={styles.feedbackRow}>
+      <Text style={[styles.feedbackLabel, { color: colors.mutedForeground }]}>
+        Want more looks like this?
+      </Text>
+      <View style={styles.feedbackBtns}>
+        <Pressable
+          onPress={() => onFeedback("more")}
+          style={({ pressed }) => [
+            styles.feedbackBtn,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
+        >
+          <Text style={[styles.feedbackBtnLabel, { color: colors.foreground }]}>
+            👍  More like this
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onFeedback("less")}
+          style={({ pressed }) => [
+            styles.feedbackBtn,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
+        >
+          <Text style={[styles.feedbackBtnLabel, { color: colors.foreground }]}>
+            👎  Less like this
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -762,5 +865,33 @@ const styles = StyleSheet.create({
   clearOverrideText: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
+  },
+  // Feedback
+  feedbackRow: {
+    marginTop: 16,
+    gap: 10,
+  },
+  feedbackLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  feedbackBtns: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  feedbackBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  feedbackBtnLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  feedbackConfirm: {
+    marginTop: 16,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
 });

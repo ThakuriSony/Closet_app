@@ -113,7 +113,7 @@ export function OutfitPreview({ outfit }: Props) {
           Ready to dress?
         </Text>
         <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
-          Pick an occasion and tap Generate Outfit.
+          Pick an occasion and tap Create looks.
         </Text>
       </View>
     );
