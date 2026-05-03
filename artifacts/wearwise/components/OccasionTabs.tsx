@@ -26,8 +26,8 @@ export function OccasionTabs({ value, onChange }: Props) {
             style={({ pressed }) => [
               styles.tab,
               {
-                backgroundColor: active ? colors.foreground : colors.card,
-                borderColor: active ? colors.foreground : colors.border,
+                backgroundColor: active ? colors.primary : colors.card,
+                borderColor: active ? colors.primary : colors.border,
                 opacity: pressed ? 0.85 : 1,
               },
             ]}
@@ -36,7 +36,7 @@ export function OccasionTabs({ value, onChange }: Props) {
               style={[
                 styles.label,
                 {
-                  color: active ? colors.background : colors.mutedForeground,
+                  color: active ? colors.primaryForeground : colors.mutedForeground,
                 },
               ]}
             >
