@@ -1,0 +1,80 @@
+You are a senior front‑end engineer refining the visual design of the Wearwise app.
+
+GOAL:
+Replace the current olive accent color with a cherry red color
+for all primary actions and emphasis states.
+
+NEW PRIMARY COLOR:
+#640002  (deep cherry red)
+
+IMPORTANT:
+This is a visual update only.
+Do NOT change layout, spacing, logic, or interactions.
+
+------------------------------------------------------------
+1) UPDATE PRIMARY ACTIONS
+
+Replace olive color with #640002 for:
+
+- Primary CTA buttons (e.g. “Create looks”)
+- Floating action buttons (FAB + button)
+- Active states (pressed / selected)
+- Primary icons tied to actions (plus icon, hearts if applicable)
+
+------------------------------------------------------------
+2) KEEP COLOR USAGE INTENTIONAL
+
+Rules:
+- #640002 = PRIMARY actions only
+- Secondary / neutral elements remain unchanged
+- Do NOT recolor backgrounds, cards, or grid
+- Do NOT overuse the red
+
+This color should signal:
+✅ “Action”
+✅ “Choice”
+✅ “User intent”
+
+------------------------------------------------------------
+3) STATES & ACCESSIBILITY
+
+Ensure:
+- Pressed / active state uses a slightly darker shade
+  (e.g. #4A0101)
+- Disabled state remains muted / gray
+- Text contrast remains readable on #640002
+
+Do NOT introduce hover animations or gradients.
+
+------------------------------------------------------------
+4) WHERE NOT TO USE RED
+
+Do NOT apply #640002 to:
+- Canvas background
+- Outfit preview cards
+- Grid lines
+- Informational text (“Why this works”)
+- Feedback copy
+
+Red should not feel aggressive or error‑like.
+
+------------------------------------------------------------
+5) CONSISTENCY CHECK
+
+After update, verify:
+- All primary actions share the same red color
+- No leftover olive color exists in the app
+- Visual hierarchy still feels calm and premium
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Updated color constants / theme file
+2) Updated button and FAB styles
+3) Confirmation of removed olive color
+
+CONSTRAINTS:
+- No redesign
+- No new colors added
+- Stick to #640002 as the single primary accent
+
+Start implementing now.
