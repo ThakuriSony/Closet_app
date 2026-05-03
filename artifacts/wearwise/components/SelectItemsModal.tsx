@@ -148,8 +148,8 @@ export function SelectItemsModal({ visible, onClose, onImport }: Props) {
                 style={({ pressed }) => [
                   styles.chip,
                   {
-                    backgroundColor: active ? colors.foreground : colors.card,
-                    borderColor: active ? colors.foreground : colors.border,
+                    backgroundColor: active ? colors.primary : colors.card,
+                    borderColor: active ? colors.primary : colors.border,
                     opacity: pressed ? 0.8 : 1,
                   },
                 ]}
@@ -159,7 +159,7 @@ export function SelectItemsModal({ visible, onClose, onImport }: Props) {
                     styles.chipLabel,
                     {
                       color: active
-                        ? colors.background
+                        ? colors.primaryForeground
                         : colors.mutedForeground,
                     },
                   ]}

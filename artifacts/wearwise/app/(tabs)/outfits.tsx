@@ -482,8 +482,8 @@ function OutfitFilterChips({
             style={({ pressed }) => [
               styles.chip,
               {
-                backgroundColor: active ? colors.foreground : colors.card,
-                borderColor: active ? colors.foreground : colors.border,
+                backgroundColor: active ? colors.primary : colors.card,
+                borderColor: active ? colors.primary : colors.border,
                 opacity: pressed ? 0.85 : 1,
               },
             ]}
@@ -492,7 +492,7 @@ function OutfitFilterChips({
               <Feather
                 name="heart"
                 size={12}
-                color={active ? colors.background : colors.mutedForeground}
+                color={active ? colors.primaryForeground : colors.mutedForeground}
               />
             )}
             <Text
@@ -500,7 +500,7 @@ function OutfitFilterChips({
                 styles.chipLabel,
                 {
                   color: active
-                    ? colors.background
+                    ? colors.primaryForeground
                     : colors.mutedForeground,
                 },
               ]}

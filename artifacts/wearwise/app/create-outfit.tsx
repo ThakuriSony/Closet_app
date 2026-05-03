@@ -142,7 +142,7 @@ export default function CreateOutfitScreen() {
               style={({ pressed }) => [
                 styles.tab,
                 {
-                  borderBottomColor: active ? colors.foreground : "transparent",
+                  borderBottomColor: active ? colors.primary : "transparent",
                   opacity: pressed ? 0.7 : 1,
                 },
               ]}
@@ -151,7 +151,7 @@ export default function CreateOutfitScreen() {
                 style={[
                   styles.tabLabel,
                   {
-                    color: active ? colors.foreground : colors.mutedForeground,
+                    color: active ? colors.primary : colors.mutedForeground,
                   },
                 ]}
               >

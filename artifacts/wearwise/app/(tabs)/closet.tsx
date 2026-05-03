@@ -287,7 +287,7 @@ function ModeToggle({
               style={[
                 styles.modeText,
                 {
-                  color: active ? colors.background : colors.mutedForeground,
+                  color: active ? colors.primaryForeground : colors.mutedForeground,
                 },
               ]}
             >
@@ -377,8 +377,8 @@ function FilterChips({
               style={({ pressed }) => [
                 styles.chip,
                 {
-                  backgroundColor: active ? colors.foreground : colors.card,
-                  borderColor: active ? colors.foreground : colors.border,
+                  backgroundColor: active ? colors.primary : colors.card,
+                  borderColor: active ? colors.primary : colors.border,
                   opacity: pressed ? 0.85 : 1,
                   flexDirection: "row",
                   alignItems: "center",
@@ -390,14 +390,14 @@ function FilterChips({
                 <Feather
                   name="heart"
                   size={12}
-                  color={active ? colors.background : colors.mutedForeground}
+                  color={active ? colors.primaryForeground : colors.mutedForeground}
                 />
               ) : null}
               <Text
                 style={[
                   styles.chipLabel,
                   {
-                    color: active ? colors.background : colors.mutedForeground,
+                    color: active ? colors.primaryForeground : colors.mutedForeground,
                   },
                 ]}
               >

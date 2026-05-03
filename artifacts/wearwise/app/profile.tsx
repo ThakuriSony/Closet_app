@@ -179,9 +179,9 @@ export default function ProfileScreen() {
                   styles.row,
                   {
                     backgroundColor: active
-                      ? colors.foreground
+                      ? colors.primary
                       : colors.background,
-                    borderColor: active ? colors.foreground : colors.border,
+                    borderColor: active ? colors.primary : colors.border,
                     opacity: pressed || busy ? 0.85 : 1,
                   },
                 ]}
@@ -190,7 +190,7 @@ export default function ProfileScreen() {
                   style={[
                     styles.rowText,
                     {
-                      color: active ? colors.background : colors.foreground,
+                      color: active ? colors.primaryForeground : colors.foreground,
                     },
                   ]}
                 >

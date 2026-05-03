@@ -75,9 +75,9 @@ export function PreferencesModal({
                     styles.row,
                     {
                       backgroundColor: active
-                        ? colors.foreground
+                        ? colors.primary
                         : colors.card,
-                      borderColor: active ? colors.foreground : colors.border,
+                      borderColor: active ? colors.primary : colors.border,
                       opacity: pressed ? 0.85 : 1,
                     },
                   ]}
@@ -87,7 +87,7 @@ export function PreferencesModal({
                       styles.rowText,
                       {
                         color: active
-                          ? colors.background
+                          ? colors.primaryForeground
                           : colors.foreground,
                       },
                     ]}
