@@ -54,6 +54,8 @@ function distributeMasonry<T extends { id: string }>(
 type Filter = "All" | "Favorites" | Category;
 type ViewMode = "Closet" | "Laundry";
 
+const WASHABLE: ReadonlySet<string> = new Set(["Top", "Bottom", "Dress", "Outerwear"]);
+
 export default function ClosetScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -62,7 +64,7 @@ export default function ClosetScreen() {
   const [mode, setMode] = useState<ViewMode>("Closet");
 
   const dirtyCount = useMemo(
-    () => items.filter((i) => i.status === "dirty").length,
+    () => items.filter((i) => i.status === "dirty" && WASHABLE.has(i.category)).length,
     [items],
   );
 
@@ -72,7 +74,7 @@ export default function ClosetScreen() {
   );
 
   const dirtyItems = useMemo(
-    () => items.filter((i) => i.status === "dirty"),
+    () => items.filter((i) => i.status === "dirty" && WASHABLE.has(i.category)),
     [items],
   );
 

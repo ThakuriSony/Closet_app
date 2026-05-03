@@ -23,7 +23,11 @@ function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
+const NON_WASHABLE: ReadonlySet<Category> = new Set(["Shoes", "Accessories"]);
+
 function normalizeItem(raw: Partial<ClothingItem> & { id: string }): ClothingItem {
+  const category = (raw.category ?? "Top") as Category;
+  const nonWashable = NON_WASHABLE.has(category);
   return {
     id: raw.id,
     imageUri: raw.imageUri ?? "",
@@ -31,12 +35,12 @@ function normalizeItem(raw: Partial<ClothingItem> & { id: string }): ClothingIte
       typeof raw.processedImageUri === "string" && raw.processedImageUri
         ? raw.processedImageUri
         : null,
-    category: (raw.category ?? "Top") as Category,
+    category,
     color: raw.color ?? "",
     tags: raw.tags ?? [],
     createdAt: raw.createdAt ?? Date.now(),
-    wearCount: typeof raw.wearCount === "number" ? raw.wearCount : 0,
-    status: raw.status === "dirty" ? "dirty" : "clean",
+    wearCount: nonWashable ? 0 : (typeof raw.wearCount === "number" ? raw.wearCount : 0),
+    status: nonWashable ? "clean" : (raw.status === "dirty" ? "dirty" : "clean"),
     lastWorn: typeof raw.lastWorn === "number" ? raw.lastWorn : null,
     isFavorite: raw.isFavorite === true,
   };
@@ -229,6 +233,7 @@ export function WardrobeProvider({ children }: { children: React.ReactNode }) {
       const now = Date.now();
       const next = items.map((it) => {
         if (!ids.has(it.id)) return it;
+        if (NON_WASHABLE.has(it.category)) return it;
         const wearCount = it.wearCount + 1;
         const status =
           wearCount >= dirtyThreshold ? ("dirty" as const) : it.status;

@@ -1,0 +1,90 @@
+You are a senior full‑stack engineer refining the Laundry system
+in the Wearwise app.
+
+GOAL:
+Ensure that Shoes and Accessories are never included in the Laundry system,
+as they are not washable items.
+
+IMPORTANT:
+This is a logic correction based on real‑world behavior.
+Do NOT add user settings or toggles for this.
+This rule must be enforced system‑wide.
+
+------------------------------------------------------------
+1) DEFINE NON‑WASHABLE CATEGORIES (CRITICAL)
+
+Treat the following categories as NON‑WASHABLE:
+- Shoes
+- Accessories
+
+These categories must:
+- Never increment wear_count
+- Never be marked dirty
+- Never appear in Laundry view
+
+------------------------------------------------------------
+2) UPDATE WEAR TRACKING LOGIC
+
+When user taps “Wear this look”:
+- Loop through outfit items
+- Increment wear_count ONLY if category is:
+  Top, Bottom, Dress, or Outerwear
+- Skip Shoes and Accessories entirely
+
+Do NOT create wear_count entries for non‑washable items.
+
+------------------------------------------------------------
+3) UPDATE DIRTY LOGIC
+
+Dirty status logic applies ONLY to washable categories.
+
+Rules:
+- If category is Shoes or Accessories:
+  - status must always remain "clean"
+  - status must never change
+
+------------------------------------------------------------
+4) UPDATE LAUNDRY VIEW FILTER
+
+Laundry tab must:
+- Query and display ONLY items where:
+  - category in [Top, Bottom, Dress, Outerwear]
+  - status === "dirty"
+
+Shoes and Accessories must never be rendered,
+even if they somehow have wear data from earlier versions.
+
+------------------------------------------------------------
+5) BACKWARD COMPATIBILITY SAFETY
+
+If existing data contains:
+- Shoes or Accessories with wear_count or dirty status
+
+Then:
+- Reset wear_count to 0
+- Force status = "clean"
+- Exclude from Laundry view
+
+------------------------------------------------------------
+6) UI CONSISTENCY
+
+Do NOT:
+- Show laundry buttons on shoe/accessory cards
+- Show “Mark as washed” for non‑washable categories
+
+Laundry UI is for garments only.
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Updated wear tracking logic
+2) Updated laundry filter logic
+3) Data cleanup handling for existing items
+4) Test scenarios
+
+------------------------------------------------------------
+CONSTRAINTS:
+- No new UI screens
+- No extra user settings
+- Keep everything simple and logical
+
+Start implementing now.
