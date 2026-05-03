@@ -1,0 +1,130 @@
+You are a senior graphics & product engineer upgrading the Wearwise avatar system.
+
+THIS PROMPT REPLACES the current stylized avatar renderer.
+
+GOAL:
+Convert the existing stylized avatar into a
+✅ semi‑realistic
+✅ body‑accurate
+✅ privacy‑safe 3D avatar
+
+DO NOT:
+- Add outfit try‑on logic here
+- Add AR or camera overlays
+- Add face realism or identity cloning
+- Change any Studio or Home UI
+
+------------------------------------------------------------
+1) INPUT DATA AVAILABLE
+
+You have:
+- height_value + unit
+- weight_value + unit
+- face_shape
+- skin_tone
+- undertone (optional)
+- face_photo_url (optional)
+- avatar_status = confirmed
+
+------------------------------------------------------------
+2) AVATAR REALISM LEVEL (LOCKED)
+
+Target realism:
+✅ Human‑like body proportions
+✅ Smooth anatomical contours
+✅ Natural shoulder / waist / hip geometry
+✅ Mild 3D depth & shading
+
+NOT:
+❌ Photoreal
+❌ Identity‑matching
+❌ Facial likeness cloning
+
+The avatar should feel:
+“Like a neutral mannequin with a real human body”
+
+------------------------------------------------------------
+3) BODY MODEL (CRITICAL CHANGE)
+
+Replace geometric shapes with a deformable parametric body model.
+
+Requirements:
+- Single neutral standing pose
+- Front‑facing
+- Arms relaxed
+- Feet aligned naturally
+
+Body deformation rules:
+- Height scales skeleton length
+- Weight drives volume (thighs, hips, midsection, arms)
+- Smooth interpolation (NO hard categories)
+- No labels like slim/curvy shown to user
+
+------------------------------------------------------------
+4) FACE MODEL (SIMPLIFIED BUT HUMAN)
+
+Face should:
+- Respect selected face_shape outline
+- Use smooth shading
+- No sharp geometry
+- No detailed eyes, nose, mouth realism
+
+If face_photo_url exists:
+✅ May be used for:
+- Skin tone calibration
+- Approximate head proportions
+
+❌ Must NOT:
+- Reconstruct facial identity
+- Store facial landmarks permanently
+
+------------------------------------------------------------
+5) SKIN & MATERIALS
+
+- Single clean skin material
+- Soft lighting
+- No texture noise
+- No makeup
+- No hair detail yet
+
+Skin tone must clearly match selection (Ivory → Espresso range).
+
+------------------------------------------------------------
+6) RENDERING OUTPUT
+
+Produce:
+- One neutral avatar render
+- Still image or lightweight 3D render
+- Same background used currently
+
+Replace the current flat avatar
+with this semi‑realistic version everywhere avatar is shown.
+
+------------------------------------------------------------
+7) FALLBACK & SAFETY
+
+If advanced rendering fails:
+- Fallback to previous stylized avatar
+- Show message:
+  “Using simplified avatar preview”
+
+Never block the user.
+
+------------------------------------------------------------
+8) WHAT NOT TO ADD YET
+
+DO NOT:
+- Add clothing
+- Add animation
+- Add rotation
+- Add realism claims
+- Change confirmation UI
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Semi‑realistic avatar renderer
+2) Body‑accurate deformation from height + weight
+3) Replaced avatar preview screen
+4) Safety fallback handling
+
+STOP after this upgrade.
