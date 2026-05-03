@@ -6,11 +6,18 @@ const router: IRouter = Router();
 const ALLOWED_CATEGORIES = [
   "Top",
   "Bottom",
-  "Shoes",
+  "Dress",
   "Outerwear",
+  "Shoes",
   "Accessories",
 ] as const;
 type Category = (typeof ALLOWED_CATEGORIES)[number];
+
+const ALLOWED_STYLE_TAGS = new Set([
+  "casual", "formal", "work", "party", "gym", "streetwear", "lounge", "athleisure",
+]);
+const ALLOWED_DRESS_TAGS = new Set(["mini", "midi", "maxi"]);
+const ALLOWED_SHOE_TAGS  = new Set(["heels", "sneakers", "boots", "flats", "sandals"]);
 
 interface TagResult {
   category: Category;
@@ -18,21 +25,41 @@ interface TagResult {
   tags: string[];
 }
 
-const SYSTEM_PROMPT = `You are an expert fashion stylist that tags clothing items.
-Analyze the full clothing item in this image. If part of the clothing is not fully visible, infer the most likely category carefully based on the visible portion (fabric, seams, silhouette, position in frame).
-Return ONLY valid JSON in this exact format:
-{
-  "category": one of [Top, Bottom, Shoes, Outerwear, Accessories],
-  "color": main color of the item as a short string (e.g. "Charcoal", "Cream", "Navy"),
-  "tags": array of 2-5 short descriptive tags (e.g. casual, formal, sporty, denim, cotton, linen, summer)
-}
+const SYSTEM_PROMPT = `Analyze this clothing item image and return ONLY valid JSON.
+Choose ONE category from:
+Top, Bottom, Dress, Outerwear, Shoes, Accessories.
+
 Category guidance:
 - Top = shirts, t-shirts, blouses, sweaters, hoodies (worn on torso, not as a coat)
 - Bottom = pants, jeans, shorts, skirts, leggings (worn below the waist)
-- Shoes = any footwear
+- Dress = one-piece garments covering torso and legs together
 - Outerwear = jackets, coats, blazers, parkas (worn over a top)
+- Shoes = any footwear
 - Accessories = bags, hats, belts, scarves, jewelry, glasses
-Do not include any explanation, markdown, or extra text. Output JSON only.`;
+
+Also return the main color of the item as a short string (e.g. "Charcoal", "Cream", "Navy").
+
+Then assign up to 5 highly confident tags from the following lists ONLY:
+
+Style / occasion tags:
+casual, formal, work, party, gym, streetwear, lounge, athleisure
+
+Dress length tags (ONLY if category is Dress):
+mini, midi, maxi
+
+Footwear type tags (ONLY if category is Shoes):
+heels, sneakers, boots, flats, sandals
+
+Return ONLY valid JSON in this format:
+{
+  "category": "Top | Bottom | Dress | Outerwear | Shoes | Accessories",
+  "color": "main color",
+  "tags": ["tag1", "tag2"]
+}
+
+If a tag is unclear, omit it.
+Do not guess.
+Do not include explanations or extra text.`;
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim();
@@ -73,7 +100,12 @@ function validateTagResult(raw: unknown): TagResult | null {
     tags = r["tags"]
       .filter((t): t is string => typeof t === "string")
       .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
+      .filter((t) => {
+        if (ALLOWED_STYLE_TAGS.has(t)) return true;
+        if (matchedCategory === "Dress" && ALLOWED_DRESS_TAGS.has(t)) return true;
+        if (matchedCategory === "Shoes" && ALLOWED_SHOE_TAGS.has(t)) return true;
+        return false;
+      })
       .slice(0, 5);
   }
 

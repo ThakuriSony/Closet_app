@@ -94,9 +94,9 @@ function buildTagFrequency(items: ClothingItem[]): Map<string, number> {
   return freq;
 }
 
-// A "Top" item is a dress if it carries the "dress" tag.
+// A dress is any item whose category is "Dress".
 function isDress(item: ClothingItem): boolean {
-  return item.tags.map(normalize).includes("dress");
+  return item.category === "Dress";
 }
 
 function scoreItem(
@@ -179,10 +179,10 @@ function selectTemplate(
   occasion: Occasion,
 ): OutfitTemplate {
   const dresses = items.filter(
-    (i) => i.category === "Top" && i.status !== "dirty" && isDress(i),
+    (i) => i.category === "Dress" && i.status !== "dirty",
   );
   const regularTops = items.filter(
-    (i) => i.category === "Top" && i.status !== "dirty" && !isDress(i),
+    (i) => i.category === "Top" && i.status !== "dirty",
   );
   const bottoms = items.filter(
     (i) => i.category === "Bottom" && i.status !== "dirty",
@@ -201,9 +201,9 @@ function selectTemplate(
   }
 
   // Fallback: use whichever template has enough items (including dirty).
-  const anyDress = items.some((i) => i.category === "Top" && isDress(i));
+  const anyDress = items.some((i) => i.category === "Dress");
   const anyTopBottom =
-    items.some((i) => i.category === "Top" && !isDress(i)) &&
+    items.some((i) => i.category === "Top") &&
     items.some((i) => i.category === "Bottom");
 
   if (DRESS_PREFERRED_OCCASIONS.includes(occasion)) {
@@ -217,7 +217,7 @@ function selectTemplate(
 // ---------------------------------------------------------------------------
 
 function isValidOutfit(outfit: GeneratedOutfit): boolean {
-  const topIsDress = outfit.top ? isDress(outfit.top) : false;
+  const topIsDress = outfit.top?.category === "Dress";
 
   // Dress cannot be combined with a Bottom
   if (topIsDress && outfit.bottom) return false;
@@ -307,14 +307,10 @@ export function generateOutfit(
   const template = selectTemplate(items, effectiveOccasion);
 
   // Step 2 — Pick items strictly within template constraints
-  const top = pickBestFor(
-    items,
-    "Top",
-    effectiveOccasion,
-    bodyBucket,
-    freq,
-    template === "DRESS_SHOES" ? isDress : (i) => !isDress(i),
-  );
+  const top =
+    template === "DRESS_SHOES"
+      ? pickBestFor(items, "Dress", effectiveOccasion, bodyBucket, freq)
+      : pickBestFor(items, "Top", effectiveOccasion, bodyBucket, freq);
 
   const bottom =
     template === "TOP_BOTTOM_SHOES"
@@ -366,14 +362,10 @@ export function generateOutfit(
     const fallbackTemplate: OutfitTemplate =
       template === "DRESS_SHOES" ? "TOP_BOTTOM_SHOES" : "DRESS_SHOES";
 
-    const fTop = pickBestFor(
-      items,
-      "Top",
-      effectiveOccasion,
-      bodyBucket,
-      freq,
-      fallbackTemplate === "DRESS_SHOES" ? isDress : (i) => !isDress(i),
-    );
+    const fTop =
+      fallbackTemplate === "DRESS_SHOES"
+        ? pickBestFor(items, "Dress", effectiveOccasion, bodyBucket, freq)
+        : pickBestFor(items, "Top", effectiveOccasion, bodyBucket, freq);
     const fBottom =
       fallbackTemplate === "TOP_BOTTOM_SHOES"
         ? pickBestFor(items, "Bottom", effectiveOccasion, bodyBucket, freq)
@@ -460,10 +452,10 @@ export function generateOutfitOptions(
   const template = selectTemplate(items, effectiveOccasion);
   const accessories = pickTopAccessories(items, effectiveOccasion, bodyBucket, freq, 3);
 
-  const topFilter =
-    template === "DRESS_SHOES" ? isDress : (i: ClothingItem) => !isDress(i);
-
-  const rankedTops = rankItems(items, "Top", effectiveOccasion, bodyBucket, freq, topFilter);
+  const rankedTops =
+    template === "DRESS_SHOES"
+      ? rankItems(items, "Dress", effectiveOccasion, bodyBucket, freq)
+      : rankItems(items, "Top", effectiveOccasion, bodyBucket, freq);
   const rankedBottoms =
     template === "TOP_BOTTOM_SHOES"
       ? rankItems(items, "Bottom", effectiveOccasion, bodyBucket, freq)

@@ -1,8 +1,9 @@
-export type Category = "Top" | "Bottom" | "Shoes" | "Outerwear" | "Accessories";
+export type Category = "Top" | "Bottom" | "Dress" | "Shoes" | "Outerwear" | "Accessories";
 
 export const CATEGORIES: Category[] = [
   "Top",
   "Bottom",
+  "Dress",
   "Shoes",
   "Outerwear",
   "Accessories",

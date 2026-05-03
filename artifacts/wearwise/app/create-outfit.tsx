@@ -34,6 +34,7 @@ export default function CreateOutfitScreen() {
   const [selection, setSelection] = useState<Record<Category, string | null>>({
     Top: null,
     Bottom: null,
+    Dress: null,
     Shoes: null,
     Outerwear: null,
     Accessories: null,

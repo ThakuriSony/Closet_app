@@ -34,6 +34,7 @@ const ITEM_ASPECT = 1.35;    // portrait box — height = width × this factor
 const STACK_ORDER: Partial<Record<Category, number>> = {
   Outerwear: 0,
   Top: 1,
+  Dress: 1,
   Bottom: 2,
   Shoes: 3,
   Accessories: 4,
@@ -56,6 +57,7 @@ function categoryAspect(cat: Category): number {
   switch (cat) {
     case "Outerwear": return 1.3;
     case "Top":       return 1.3;
+    case "Dress":     return 1.8;
     case "Bottom":    return 1.8;
     case "Shoes":     return 0.6;
     default:          return 1.3; // Accessories etc.

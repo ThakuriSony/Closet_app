@@ -1,0 +1,161 @@
+You are a senior full-stack engineer. We are updating the AI auto-tagging system
+in the Wearwise app.
+
+CURRENT STATE:
+- Auto AI tagging exists for clothing items
+- Categories currently supported:
+  Top, Bottom, Shoes, Outerwear, Accessories
+- AI returns category + tags (string array)
+- User can edit tags before saving
+
+GOAL:
+Extend the existing system to:
+1) Add a new category: Dress
+2) Add structured occasion / style tags
+3) Add dress-length tags ONLY for dresses
+4) Add footwear-type tags ONLY for shoes
+5) Keep AI tagging conservative and accurate (3–5 tags max)
+
+IMPORTANT:
+- Do NOT add fit, warmth, or material tags
+- Do NOT add free-form or aesthetic tags
+- Do NOT over-tag
+- Prefer clarity and correctness over quantity
+
+------------------------------------------------------------
+1) UPDATE CATEGORY ENUM (CRITICAL)
+
+Update category list to:
+- Top
+- Bottom
+- Dress
+- Outerwear
+- Shoes
+- Accessories
+
+Ensure:
+- Category is REQUIRED
+- Dress is treated as a first-class category (not a tag)
+
+------------------------------------------------------------
+2) ADD OCCASION / STYLE TAGS (ALL CATEGORIES)
+
+The AI may assign ZERO or more of the following tags:
+
+Allowed style tags:
+- casual
+- formal
+- work
+- party
+- gym
+- streetwear
+- lounge
+- athleisure
+
+Rules:
+- Assign ONLY tags that are strongly supported by the image
+- Do NOT guess multiple styles if unclear
+- Prefer 1–2 style tags where possible
+
+------------------------------------------------------------
+3) ADD DRESS-SPECIFIC TAGS (ONLY IF category = Dress)
+
+Allowed dress length tags:
+- mini
+- midi
+- maxi
+
+Rules:
+- Assign AT MOST ONE length tag
+- Only assign if length is visually clear
+- If unclear, omit length tag
+
+------------------------------------------------------------
+4) ADD FOOTWEAR-SPECIFIC TAGS (ONLY IF category = Shoes)
+
+Allowed footwear type tags:
+- heels
+- sneakers
+- boots
+- flats
+- sandals
+
+Rules:
+- Assign AT MOST ONE footwear type tag
+- Only assign if visually obvious
+- Do NOT infer occasion just from shoe type
+
+------------------------------------------------------------
+5) AI OUTPUT FORMAT (STRICT — JSON ONLY)
+
+AI MUST return ONLY valid JSON in this format:
+
+{
+  "category": "Top | Bottom | Dress | Outerwear | Shoes | Accessories",
+  "tags": ["string", "string"]
+}
+
+Rules:
+- tags array must contain ONLY allowed tags
+- Maximum 5 tags total
+- Do NOT include explanations
+- Do NOT include unknown or invented tags
+
+------------------------------------------------------------
+6) AI PROMPT TO USE (VERY IMPORTANT)
+
+Use this EXACT prompt when calling the AI:
+
+"Analyze this clothing item image and return ONLY valid JSON.
+Choose ONE category from:
+Top, Bottom, Dress, Outerwear, Shoes, Accessories.
+
+Then assign up to 5 highly confident tags from the following lists ONLY:
+
+Style / occasion tags:
+casual, formal, work, party, gym, streetwear, lounge, athleisure
+
+Dress length tags (ONLY if category is Dress):
+mini, midi, maxi
+
+Footwear type tags (ONLY if category is Shoes):
+heels, sneakers, boots, flats, sandals
+
+If a tag is unclear, omit it.
+Do not guess.
+Do not include explanations or extra text."
+
+------------------------------------------------------------
+7) UI & DATA HANDLING (NO BREAKING CHANGES)
+
+- Store category as before
+- Store tags as simple string array (existing schema)
+- UI continues to allow user edits before save
+- Outfit engine will later use these tags (no changes now)
+
+------------------------------------------------------------
+8) ERROR & FALLBACK
+
+If AI response:
+- Is invalid JSON
+- Uses unknown tags
+- Misses category
+
+Then:
+- Retry ONCE with same prompt
+- If still invalid → fallback to manual entry
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Updated tagging logic
+2) Updated category options (including Dress)
+3) Updated AI prompt usage
+4) Testing checklist
+
+CONSTRAINTS:
+- Do NOT add new tag groups
+- Do NOT expand beyond specified tags
+- Do NOT overengineer
+- Keep everything readable and deterministic
+
+Start updating the auto-tagging system now.
