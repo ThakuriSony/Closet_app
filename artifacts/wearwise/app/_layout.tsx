@@ -14,7 +14,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AvatarProvider } from "@/contexts/AvatarContext";
+import { StyleProfileProvider } from "@/contexts/StyleProfileContext";
 import { EventsProvider } from "@/contexts/EventsContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { WardrobeProvider } from "@/contexts/WardrobeContext";
@@ -29,58 +29,28 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="add-item"
-        options={{
-          presentation: "modal",
-          title: "Add Item",
-        }}
+        options={{ presentation: "modal", title: "Add Item" }}
       />
       <Stack.Screen
         name="create-outfit"
-        options={{
-          presentation: "modal",
-          title: "Create Outfit",
-        }}
+        options={{ presentation: "modal", title: "Create Outfit" }}
       />
       <Stack.Screen
         name="add-event"
-        options={{
-          presentation: "modal",
-          title: "Add Event",
-        }}
+        options={{ presentation: "modal", title: "Add Event" }}
       />
-      <Stack.Screen
-        name="item/[id]"
-        options={{
-          title: "Item",
-        }}
-      />
+      <Stack.Screen name="item/[id]" options={{ title: "Item" }} />
       <Stack.Screen
         name="studio"
-        options={{
-          presentation: "modal",
-          headerShown: false,
-        }}
+        options={{ presentation: "modal", headerShown: false }}
       />
       <Stack.Screen
         name="profile"
-        options={{
-          title: "Profile",
-          presentation: "modal",
-        }}
+        options={{ title: "Profile", presentation: "modal" }}
       />
       <Stack.Screen
-        name="avatar-setup"
-        options={{
-          headerShown: false,
-          presentation: "modal",
-        }}
-      />
-      <Stack.Screen
-        name="avatar-preview"
-        options={{
-          headerShown: false,
-          presentation: "modal",
-        }}
+        name="style-profile"
+        options={{ headerShown: false, presentation: "modal" }}
       />
     </Stack>
   );
@@ -109,13 +79,13 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <ProfileProvider>
-                <AvatarProvider>
+                <StyleProfileProvider>
                   <WardrobeProvider>
                     <EventsProvider>
                       <RootLayoutNav />
                     </EventsProvider>
                   </WardrobeProvider>
-                </AvatarProvider>
+                </StyleProfileProvider>
               </ProfileProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

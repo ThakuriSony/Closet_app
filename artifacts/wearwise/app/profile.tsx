@@ -1,6 +1,5 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -15,16 +14,66 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AvatarRenderer } from "@/components/AvatarRenderer";
-import { useAvatar } from "@/contexts/AvatarContext";
+import { useStyleProfile } from "@/contexts/StyleProfileContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useColors } from "@/hooks/useColors";
+import { getStyleInsights } from "@/services/styleInsightEngine";
 import {
   DIRTY_THRESHOLD_MAX,
   DIRTY_THRESHOLD_MIN,
 } from "@/types";
 
 const H_PADDING = 20;
+
+// ---------------------------------------------------------------------------
+// Profile summary pill
+// ---------------------------------------------------------------------------
+
+function ProfileSummaryRow({ label, value, colors }: {
+  label: string;
+  value: string | null;
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+}) {
+  if (!value) return null;
+  return (
+    <View style={summaryStyles.row}>
+      <Text style={[summaryStyles.label, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text style={[summaryStyles.value, { color: colors.foreground }]}>{value}</Text>
+    </View>
+  );
+}
+
+const summaryStyles = StyleSheet.create({
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 5 },
+  label: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  value: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+});
+
+// ---------------------------------------------------------------------------
+// Insights panel (expanded, non-collapsible for profile)
+// ---------------------------------------------------------------------------
+
+function InsightBullet({ text, colors }: {
+  text: string;
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+}) {
+  return (
+    <View style={insightStyles.bullet}>
+      <View style={[insightStyles.dot, { backgroundColor: colors.primary }]} />
+      <Text style={[insightStyles.text, { color: colors.mutedForeground }]}>{text}</Text>
+    </View>
+  );
+}
+
+const insightStyles = StyleSheet.create({
+  bullet: { flexDirection: "row", alignItems: "flex-start", gap: 9 },
+  dot: { width: 5, height: 5, borderRadius: 3, marginTop: 7, flexShrink: 0 },
+  text: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+});
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -38,12 +87,10 @@ export default function ProfileScreen() {
     notificationsEnabled,
     setNotificationsEnabled,
   } = useProfile();
-  const { avatar, clearFacePhoto } = useAvatar();
+  const { profile } = useStyleProfile();
 
   const [nameDraft, setNameDraft] = useState<string>(name ?? "");
-  const [pickingThreshold, setPickingThreshold] = useState<number | null>(
-    null,
-  );
+  const [pickingThreshold, setPickingThreshold] = useState<number | null>(null);
   const initialName = useRef(name);
 
   useEffect(() => {
@@ -81,6 +128,25 @@ export default function ProfileScreen() {
 
   const dirty = nameDraft.trim() !== (name ?? "");
 
+  // ── Styling insights ──────────────────────────────────────────────────────
+  const insights = getStyleInsights(profile);
+
+  // ── Height display ────────────────────────────────────────────────────────
+  const heightDisplay = (() => {
+    if (profile.height_value === null) return null;
+    if (profile.height_unit === "cm") return `${profile.height_value} cm`;
+    // ft encoding: index → ft' in"
+    const idx = profile.height_value;
+    const ft  = 4 + Math.floor(idx / 12);
+    const inch = idx % 12;
+    return `${ft}' ${inch}"`;
+  })();
+
+  const weightDisplay = (() => {
+    if (profile.weight_value === null) return null;
+    return `${profile.weight_value} ${profile.weight_unit}`;
+  })();
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -91,16 +157,10 @@ export default function ProfileScreen() {
       }}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={[styles.section, { color: colors.mutedForeground }]}>
-        Profile
-      </Text>
+      {/* ─── Profile name ─────────────────────────────────────────── */}
+      <Text style={[styles.section, { color: colors.mutedForeground }]}>Profile</Text>
 
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      >
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.label, { color: colors.foreground }]}>
           What should we call you?
         </Text>
@@ -115,56 +175,24 @@ export default function ProfileScreen() {
           returnKeyType="done"
           onSubmitEditing={onSaveName}
           onBlur={onSaveName}
-          style={[
-            styles.input,
-            {
-              backgroundColor: colors.background,
-              borderColor: colors.border,
-              color: colors.foreground,
-            },
-          ]}
+          style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
         />
         {dirty ? (
           <Pressable
             onPress={onSaveName}
-            style={({ pressed }) => [
-              styles.saveBtn,
-              {
-                backgroundColor: colors.primary,
-                opacity: pressed ? 0.85 : 1,
-              },
-            ]}
+            style={({ pressed }) => [styles.saveBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
           >
-            <Feather
-              name="check"
-              size={14}
-              color={colors.primaryForeground}
-            />
-            <Text
-              style={[
-                styles.saveLabel,
-                { color: colors.primaryForeground },
-              ]}
-            >
-              Save name
-            </Text>
+            <Feather name="check" size={14} color={colors.primaryForeground} />
+            <Text style={[styles.saveLabel, { color: colors.primaryForeground }]}>Save name</Text>
           </Pressable>
         ) : null}
       </View>
 
-      <Text style={[styles.section, { color: colors.mutedForeground }]}>
-        Laundry Settings
-      </Text>
+      {/* ─── Laundry settings ─────────────────────────────────────── */}
+      <Text style={[styles.section, { color: colors.mutedForeground }]}>Laundry Settings</Text>
 
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.label, { color: colors.foreground }]}>
-          Laundry Sensitivity
-        </Text>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.label, { color: colors.foreground }]}>Laundry Sensitivity</Text>
         <Text style={[styles.value, { color: colors.mutedForeground }]}>
           {hasDirtyThreshold
             ? `After ${dirtyThreshold} ${dirtyThreshold === 1 ? "wear" : "wears"}`
@@ -174,7 +202,7 @@ export default function ProfileScreen() {
         <View style={styles.optionList}>
           {options.map((n) => {
             const active = hasDirtyThreshold && n === dirtyThreshold;
-            const busy = pickingThreshold === n;
+            const busy   = pickingThreshold === n;
             return (
               <Pressable
                 key={n}
@@ -183,163 +211,127 @@ export default function ProfileScreen() {
                 style={({ pressed }) => [
                   styles.row,
                   {
-                    backgroundColor: active
-                      ? colors.primary
-                      : colors.background,
-                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: active ? colors.primary : colors.background,
+                    borderColor:     active ? colors.primary : colors.border,
                     opacity: pressed || busy ? 0.85 : 1,
                   },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.rowText,
-                    {
-                      color: active ? colors.primaryForeground : colors.foreground,
-                    },
-                  ]}
-                >
+                <Text style={[styles.rowText, { color: active ? colors.primaryForeground : colors.foreground }]}>
                   After {n} {n === 1 ? "wear" : "wears"}
                 </Text>
-                {active ? (
-                  <Feather
-                    name="check"
-                    size={16}
-                    color={colors.background}
-                  />
-                ) : null}
+                {active ? <Feather name="check" size={16} color={colors.background} /> : null}
               </Pressable>
             );
           })}
         </View>
 
         <Text style={[styles.helper, { color: colors.mutedForeground }]}>
-          Items move to the laundry pile automatically once they reach this
-          number of wears.
+          Items move to the laundry pile automatically once they reach this number of wears.
         </Text>
       </View>
 
-      <Text style={[styles.section, { color: colors.mutedForeground }]}>
-        My Avatar
-      </Text>
+      {/* ─── My Style Profile ─────────────────────────────────────── */}
+      <Text style={[styles.section, { color: colors.mutedForeground }]}>My Style Profile</Text>
 
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      >
-        {/* Avatar mini-preview */}
-        {(avatar.avatar_status === "confirmed" || avatar.avatar_status === "setup_complete") && (
-          <View style={styles.avatarPreviewRow}>
-            <View style={[styles.avatarThumbWrap, { backgroundColor: colors.secondary }]}>
-              {avatar.avatar_provider === "avatarsdk" && avatar.avatar_thumbnail_url ? (
-                <Image
-                  source={{ uri: avatar.avatar_thumbnail_url }}
-                  style={styles.avatarThumbImg}
-                  contentFit="contain"
-                />
-              ) : avatar.avatar_config ? (
-                <AvatarRenderer config={avatar.avatar_config} size={64} />
-              ) : (
-                <Feather name="user" size={28} color={colors.mutedForeground} />
-              )}
-            </View>
-            <View style={{ flex: 1, gap: 3 }}>
-              <Text style={[styles.label, { color: colors.foreground }]}>
-                Virtual Avatar
-              </Text>
-              <Text style={[styles.value, { color: colors.mutedForeground }]}>
-                {avatar.avatar_status === "confirmed" ? "Confirmed" : "Ready for review"}
-                {avatar.avatar_provider === "avatarsdk" ? " · Photoreal" : " · Stylized"}
-              </Text>
-              {avatar.skin_tone || avatar.face_shape ? (
-                <Text style={[styles.helper, { color: colors.mutedForeground }]}>
-                  {[avatar.skin_tone, avatar.face_shape].filter(Boolean).join(" · ")}
-                </Text>
-              ) : null}
-            </View>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {profile.is_complete ? (
+          <View style={styles.profileSummary}>
+            <ProfileSummaryRow label="Height"     value={heightDisplay}       colors={colors} />
+            <ProfileSummaryRow label="Weight"     value={weightDisplay}       colors={colors} />
+            <ProfileSummaryRow label="Face shape" value={profile.face_shape}  colors={colors} />
+            <ProfileSummaryRow label="Skin tone"  value={profile.skin_tone}   colors={colors} />
+            <ProfileSummaryRow label="Undertone"  value={profile.undertone}   colors={colors} />
           </View>
-        )}
-
-        {!(avatar.avatar_status === "confirmed" || avatar.avatar_status === "setup_complete") && (
+        ) : (
           <>
             <Text style={[styles.label, { color: colors.foreground }]}>
-              Virtual Avatar
+              Style Profile
             </Text>
             <Text style={[styles.helper, { color: colors.mutedForeground }]}>
-              Optional. Helps visualize how outfits fit your body.
+              Add your measurements and features to unlock personalised style suggestions.
             </Text>
           </>
         )}
 
         <Pressable
-          onPress={() => router.push("/avatar-setup")}
+          onPress={() => router.push("/style-profile")}
           style={({ pressed }) => [
             styles.saveBtn,
-            {
-              backgroundColor: colors.primary,
-              opacity: pressed ? 0.85 : 1,
-              marginTop: 14,
-            },
+            { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1, marginTop: 14 },
           ]}
         >
-          <Feather
-            name={avatar.avatar_status !== "not_started" ? "edit-2" : "user"}
-            size={14}
-            color={colors.primaryForeground}
-          />
+          <Feather name={profile.is_complete ? "edit-2" : "user"} size={14} color={colors.primaryForeground} />
           <Text style={[styles.saveLabel, { color: colors.primaryForeground }]}>
-            {avatar.avatar_status !== "not_started"
-              ? "Edit avatar"
-              : "Create my avatar"}
+            {profile.is_complete ? "Edit style profile" : "Set up style profile"}
           </Text>
         </Pressable>
-
-        {avatar.avatar_status !== "not_started" && avatar.face_photo_url ? (
-          <Pressable
-            onPress={() => void clearFacePhoto()}
-            style={({ pressed }) => [
-              styles.deletePhotoBtn,
-              { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Feather name="trash-2" size={13} color={colors.mutedForeground} />
-            <Text style={[styles.deletePhotoText, { color: colors.mutedForeground }]}>
-              Delete face photo
-            </Text>
-          </Pressable>
-        ) : null}
       </View>
 
-      <Text style={[styles.section, { color: colors.mutedForeground }]}>
-        App Preferences
-      </Text>
+      {/* ─── What looks good on you ───────────────────────────────── */}
+      {insights.hasData && (
+        <>
+          <Text style={[styles.section, { color: colors.mutedForeground }]}>
+            What looks good on you
+          </Text>
 
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      >
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {/* Colours */}
+            {insights.color.length > 0 && (
+              <View style={styles.insightGroup}>
+                <View style={styles.insightGroupHeader}>
+                  <Feather name="droplet" size={12} color={colors.primary} />
+                  <Text style={[styles.insightGroupLabel, { color: colors.primary }]}>Colours</Text>
+                </View>
+                {insights.color.map((b, i) => <InsightBullet key={i} text={b} colors={colors} />)}
+              </View>
+            )}
+
+            {/* Silhouette */}
+            {insights.silhouette.length > 0 && (
+              <View style={styles.insightGroup}>
+                <View style={styles.insightGroupHeader}>
+                  <Feather name="layers" size={12} color={colors.primary} />
+                  <Text style={[styles.insightGroupLabel, { color: colors.primary }]}>Silhouette</Text>
+                </View>
+                {insights.silhouette.map((b, i) => <InsightBullet key={i} text={b} colors={colors} />)}
+              </View>
+            )}
+
+            {/* Lengths */}
+            {insights.length.length > 0 && (
+              <View style={styles.insightGroup}>
+                <View style={styles.insightGroupHeader}>
+                  <Feather name="arrow-down" size={12} color={colors.primary} />
+                  <Text style={[styles.insightGroupLabel, { color: colors.primary }]}>Lengths</Text>
+                </View>
+                {insights.length.map((b, i) => <InsightBullet key={i} text={b} colors={colors} />)}
+              </View>
+            )}
+
+            <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>
+              These are style suggestions, not rules. Wear what makes you feel good.
+            </Text>
+          </View>
+        </>
+      )}
+
+      {/* ─── App preferences ──────────────────────────────────────── */}
+      <Text style={[styles.section, { color: colors.mutedForeground }]}>App Preferences</Text>
+
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.toggleRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.label, { color: colors.foreground }]}>
-              Notifications
-            </Text>
+            <Text style={[styles.label, { color: colors.foreground }]}>Notifications</Text>
             <Text style={[styles.helper, { color: colors.mutedForeground }]}>
               Daily wardrobe nudges, weather heads-ups, and event reminders.
             </Text>
           </View>
           <Switch
             value={notificationsEnabled}
-            onValueChange={(v) => {
-              void setNotificationsEnabled(v);
-            }}
+            onValueChange={(v) => { void setNotificationsEnabled(v); }}
             trackColor={{ true: colors.primary, false: colors.border }}
-            thumbColor={
-              Platform.OS === "android" ? colors.background : undefined
-            }
+            thumbColor={Platform.OS === "android" ? colors.background : undefined}
           />
         </View>
       </View>
@@ -362,21 +354,9 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 18,
   },
-  label: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-  },
-  value: {
-    marginTop: 4,
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-  },
-  helper: {
-    marginTop: 6,
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 17,
-  },
+  label: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  value: { marginTop: 4, fontSize: 13, fontFamily: "Inter_500Medium" },
+  helper: { marginTop: 6, fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
   input: {
     marginTop: 14,
     paddingHorizontal: 14,
@@ -396,14 +376,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
   },
-  saveLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-  },
-  optionList: {
-    marginTop: 16,
-    gap: 8,
-  },
+  saveLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  optionList: { marginTop: 16, gap: 8 },
   row: {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -413,47 +387,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  rowText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  deletePhotoBtn: {
+  rowText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  profileSummary: { gap: 2 },
+  insightGroup: { gap: 6, marginBottom: 4 },
+  insightGroupHeader: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 2 },
+  insightGroupLabel: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, textTransform: "uppercase" },
+  disclaimer: {
     marginTop: 10,
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  deletePhotoText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
-  avatarPreviewRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    marginBottom: 4,
-  },
-  avatarThumbWrap: {
-    width: 72,
-    height: 96,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    flexShrink: 0,
-  },
-  avatarThumbImg: {
-    width: 72,
-    height: 96,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    fontStyle: "italic",
+    lineHeight: 16,
   },
 });

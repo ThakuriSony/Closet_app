@@ -1,0 +1,101 @@
+You are a senior product engineer updating Wearwise to remove
+avatar-based visualization and introduce personalized styling guidance.
+
+GOAL:
+Use existing user profile data (height, weight, skin tone, undertone,
+face/body shape) to generate helpful, respectful style recommendations.
+
+------------------------------------------------------------
+1) REMOVE AVATAR FEATURES (IMPORTANT)
+
+Completely remove:
+- Avatar creation flow
+- “On me” / try-on toggle in Studio
+- Any mention of “avatar”, “digital body”, or “try-on”
+
+Studio must revert to:
+- Flat outfit cards only
+
+------------------------------------------------------------
+2) RENAME PROFILE SECTION
+
+Rename:
+“My Avatar” → “My Style Profile”
+
+This section contains:
+- Height
+- Weight
+- Face / body shape
+- Skin tone
+- Undertone
+
+All fields remain editable.
+
+------------------------------------------------------------
+3) ADD “WHAT LOOKS GOOD ON YOU” SECTION
+
+Create a read-only insight section visible in:
+- Profile
+- Studio (as a collapsible panel)
+
+Title:
+“What looks good on you”
+
+------------------------------------------------------------
+4) STYLING INSIGHT ENGINE (RULE-BASED MVP)
+
+Based on user data, generate:
+
+A) Color guidance (from skin tone + undertone)
+Example output:
+“Warm undertones often look great in cream, olive,
+rust, and warm browns.”
+
+B) Dress & silhouette guidance (from height + shape)
+Example output:
+“A-line and wrap dresses tend to highlight your
+natural proportions.”
+
+C) Length recommendations
+Example output:
+“Above-knee or midi lengths often complement
+your height.”
+
+RULES:
+- Use soft, optional language
+- No judgement words
+- No guarantees
+
+------------------------------------------------------------
+5) WHERE TO USE THESE INSIGHTS
+
+In Studio:
+- Use insights to bias outfit suggestions
+- Do NOT surface internal rules to user
+- Do NOT block any outfit choices
+
+In Profile:
+- Show as friendly guidance bullets
+
+------------------------------------------------------------
+6) COPY & TRUST
+
+Add disclaimer text (small, friendly):
+“These are style suggestions, not rules.
+Wear what makes you feel good.”
+
+------------------------------------------------------------
+7) DATA & LOGIC
+
+Do NOT add new data collection.
+Do NOT use AI explanations yet.
+This phase is deterministic + rule-based.
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Avatar features fully removed
+2) Studio reverted to flat view only
+3) Style Profile section active
+4) Personalized style suggestions visible
+
+STOP AFTER THIS PHASE.
