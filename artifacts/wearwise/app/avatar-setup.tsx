@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { computeAvatarConfig } from "@/components/AvatarRenderer";
 import { useAvatar } from "@/contexts/AvatarContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -241,8 +242,16 @@ export default function AvatarSetupScreen() {
     if (step === 7) {
       (async () => {
         await new Promise((r) => setTimeout(r, 2500));
-        await updateAvatar({ avatar_status: "setup_complete" });
-        router.back();
+        const config = computeAvatarConfig(
+          avatar.height_value,
+          avatar.height_unit,
+          avatar.weight_value,
+          avatar.weight_unit,
+          avatar.skin_tone,
+          avatar.face_shape,
+        );
+        await updateAvatar({ avatar_status: "setup_complete", avatar_config: config });
+        router.replace("/avatar-preview");
       })();
     }
   }, [step]);

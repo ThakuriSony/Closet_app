@@ -10,6 +10,13 @@ import React, {
 
 const AVATAR_KEY = "wearwise:avatar:v1";
 
+export interface AvatarConfig {
+  skinToneHex: string;
+  heightFactor: number;
+  widthFactor: number;
+  faceShape: string;
+}
+
 export interface AvatarData {
   height_value: number | null;
   height_unit: "cm" | "ft";
@@ -19,7 +26,8 @@ export interface AvatarData {
   skin_tone: string | null;
   undertone: string | null;
   face_photo_url: string | null;
-  avatar_status: "not_started" | "setup_complete";
+  avatar_status: "not_started" | "setup_complete" | "confirmed";
+  avatar_config: AvatarConfig | null;
 }
 
 const DEFAULT: AvatarData = {
@@ -32,6 +40,7 @@ const DEFAULT: AvatarData = {
   undertone: null,
   face_photo_url: null,
   avatar_status: "not_started",
+  avatar_config: null,
 };
 
 interface AvatarContextValue {

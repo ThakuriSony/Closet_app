@@ -1,0 +1,165 @@
+You are a senior product engineer implementing PHASE 2
+of the Avatar system in the Wearwise app.
+
+THIS PROMPT ONLY COVERS:
+- Creating a stylized virtual avatar from collected user data
+- Storing the avatar representation
+- Showing a preview + confirmation
+
+DO NOT:
+- Integrate outfits
+- Add clothing try-on
+- Add avatar to Home or Studio
+- Add any AR / real-time rendering
+
+This phase is AVATAR GENERATION ONLY.
+
+------------------------------------------------------------
+1) INPUT DATA AVAILABLE (FROM PHASE 1)
+
+You already have the following stored:
+
+- height_value
+- height_unit
+- weight_value
+- weight_unit
+- face_shape
+- skin_tone
+- undertone (derived later, optional)
+- face_photo_url (optional)
+- avatar_status = "setup_complete"
+
+Use ALL of these where applicable.
+
+------------------------------------------------------------
+2) AVATAR TYPE (CRITICAL DESIGN DECISION)
+
+Create a:
+✅ Stylized
+✅ Body-accurate
+✅ Identity-safe avatar
+
+NOT photorealistic.
+NOT a face clone.
+
+Design principles:
+- Proportions matter more than facial accuracy
+- Clothing fit visualization is the future goal
+- Face should be simplified / illustration-level
+- No identity replication
+
+------------------------------------------------------------
+3) AVATAR GENERATION LOGIC
+
+Use the data as follows:
+
+HEIGHT:
+- Controls overall avatar scale
+- Relative proportions (leg length, torso height)
+
+WEIGHT:
+- Influences body volume and silhouette
+- Use smooth interpolation (no hard categories)
+- Do NOT expose numeric weight visually
+
+BODY SHAPE (derived from weight + height):
+- Adjust shoulder / waist / hip ratios
+
+FACE SHAPE:
+- Determines face outline only
+- No detailed facial features inferred
+
+SKIN TONE:
+- Applied directly to avatar skin
+- Neutral, non-stylized shading
+- No makeup, no texture realism
+
+FACE PHOTO (IF PROVIDED):
+- Use ONLY for:
+  - Better skin tone calibration
+  - Approximate face proportions
+- Do NOT reproduce facial identity
+- Do NOT store derived biometric maps
+
+------------------------------------------------------------
+4) AVATAR RENDERING (MVP TECHNICAL SCOPE)
+
+Render a:
+- 2D or 2.5D avatar
+- Front-facing, neutral pose
+- Neutral undergarment / silhouette (no fashion styling)
+
+NO:
+- Fabric physics
+- Facial expressions
+- Animations
+- Rotation
+
+------------------------------------------------------------
+5) AVATAR PREVIEW & CONFIRMATION (NON-NEGOTIABLE)
+
+After generating avatar:
+
+Screen title:
+"Your avatar is ready"
+
+Show:
+- Large avatar preview
+- Neutral background
+
+Actions:
+Primary:
+"Looks good"
+
+Secondary:
+"Adjust details"
+
+Behavior:
+- "Adjust details" returns user to avatar setup steps
+- "Looks good" confirms avatar
+
+------------------------------------------------------------
+6) DATA STORAGE (IMPORTANT)
+
+Store:
+- avatar_id
+- avatar_render_url OR render_config
+- avatar_parameters (height, proportions, skin tone)
+- avatar_status = "confirmed"
+
+Allow:
+- Full regeneration
+- Photo deletion without deleting avatar
+- Parameter adjustment in future
+
+------------------------------------------------------------
+7) WHAT NOT TO DO (HARD CONSTRAINTS)
+
+DO NOT:
+- Overlay clothes
+- Mention try-on
+- Promise realism
+- Show avatar outside Profile
+- Automatically activate avatar anywhere else
+
+DO NOT:
+- Call this a "digital twin"
+- Store biometric facial landmarks permanently
+
+------------------------------------------------------------
+8) USER CONTROL & TRUST COPY
+
+Include subtle copy:
+"This is a stylized avatar to help visualize fit and proportion.
+You can update or delete it anytime."
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Stylized avatar generation logic
+2) Avatar preview screen
+3) Confirm / Adjust flow
+4) Stored avatar state
+
+STOP IMPLEMENTATION AFTER THIS.
+
+Next phase will handle outfit visualization.
