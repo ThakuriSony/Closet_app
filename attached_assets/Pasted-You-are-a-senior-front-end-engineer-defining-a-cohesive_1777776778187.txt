@@ -1,0 +1,88 @@
+You are a senior front-end engineer defining a cohesive design system
+for the Wearwise app.
+
+GOAL:
+Adopt a soft, eye-friendly color palette using:
+- Soft Blue as the PRIMARY action color
+- Soft Yellow as a SECONDARY surface color
+
+PRIMARY COLOR:
+#4282AA  (Soft Blue)
+
+SECONDARY COLOR:
+#FFEDA2  (Soft Yellow)
+
+IMPORTANT:
+This palette must feel calm, editorial, and user-led.
+Do NOT use harsh or high-contrast color blocking.
+
+------------------------------------------------------------
+1) PRIMARY COLOR USAGE — SOFT BLUE (#4282AA)
+
+Use for:
+- Primary CTA buttons (“Create looks”, “Save look”)
+- Selected tab buttons (Occasion selector)
+- Floating action buttons (FAB)
+- Active icons tied to user actions
+
+Button rules:
+- Background: #4282AA
+- Text/Icon: white (#FFFFFF)
+- Pressed state: darker blue (e.g. #336C8F)
+- Disabled: neutral gray (unchanged)
+
+------------------------------------------------------------
+2) SECONDARY COLOR USAGE — SOFT YELLOW (#FFEDA2)
+
+Use for:
+- Section backgrounds (e.g. “Today’s Look”)
+- Highlight surfaces
+- Gentle emphasis areas
+
+Rules:
+- Do NOT use as button backgrounds
+- Do NOT use for critical actions
+- Keep it subtle and spacious
+
+------------------------------------------------------------
+3) NEUTRAL FOUNDATION (NO CHANGE)
+
+Keep existing:
+- Off-white / cream canvas (#FAF7F0)
+- Grid lines
+- Studio canvas background
+- Text colors (dark neutral)
+
+------------------------------------------------------------
+4) TABS & SELECTION STATES
+
+Selected occasion tab:
+- Background: #4282AA
+- Text: white
+- Border: none
+
+Unselected tabs:
+- Neutral background and text
+- No blue/yellow tint
+
+------------------------------------------------------------
+5) CONSISTENCY CHECK
+
+After update:
+- Blue communicates action & control
+- Yellow communicates warmth & context
+- UI feels calm, editorial, and premium
+- No previous olive, cherry red, or bright yellow remains
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Updated theme/color constants
+2) Updated button and tab styles
+3) Confirmation of full palette replacement
+
+CONSTRAINTS:
+- No redesign
+- No gradients
+- No additional colors introduced
+
+Start implementing now.
