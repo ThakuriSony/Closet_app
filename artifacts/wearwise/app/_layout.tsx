@@ -14,6 +14,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AvatarProvider } from "@/contexts/AvatarContext";
 import { EventsProvider } from "@/contexts/EventsContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { WardrobeProvider } from "@/contexts/WardrobeContext";
@@ -67,6 +68,13 @@ function RootLayoutNav() {
           presentation: "modal",
         }}
       />
+      <Stack.Screen
+        name="avatar-setup"
+        options={{
+          headerShown: false,
+          presentation: "modal",
+        }}
+      />
     </Stack>
   );
 }
@@ -94,11 +102,13 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <ProfileProvider>
-                <WardrobeProvider>
-                  <EventsProvider>
-                    <RootLayoutNav />
-                  </EventsProvider>
-                </WardrobeProvider>
+                <AvatarProvider>
+                  <WardrobeProvider>
+                    <EventsProvider>
+                      <RootLayoutNav />
+                    </EventsProvider>
+                  </WardrobeProvider>
+                </AvatarProvider>
               </ProfileProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

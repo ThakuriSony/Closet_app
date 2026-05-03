@@ -1,0 +1,248 @@
+You are a senior product engineer implementing the first phase of
+the Avatar system in the Wearwise app.
+
+THIS PROMPT ONLY COVERS:
+- Profile entry point
+- Collecting user data required to build an avatar
+- NO avatar rendering yet
+- NO outfit try-on yet
+
+IMPORTANT:
+This is a foundation step. Do NOT go beyond data collection.
+
+------------------------------------------------------------
+1) ENTRY POINT — PROFILE PAGE
+
+Location:
+- Profile page (top-right icon from Home tab)
+
+Add a new section:
+
+Title:
+"My Avatar"
+
+State handling:
+- If avatar data does NOT exist:
+  Show status text:
+  "Not created yet"
+
+Primary CTA button:
+"Create my avatar"
+
+Secondary text (microcopy, important for trust):
+"Optional. Helps visualize how outfits fit your body."
+
+This CTA opens the avatar setup flow.
+
+------------------------------------------------------------
+2) AVATAR SETUP FLOW — MULTI-STEP (MATCH REFERENCE SCREENS)
+
+Implement a step-based flow with progress indicator (Step 1 of X).
+
+The user must be able to:
+- Go back
+- Skip and exit at any time
+- Resume later (data is saved progressively)
+
+------------------------------------------------------------
+STEP 1 — HEIGHT
+
+Screen title:
+"Select height"
+
+Input:
+- Scroll / ruler picker exactly like the reference UI
+- Default unit: centimeters
+- Toggle: "Centimeter | Feet & inches"
+
+Range:
+- 140 cm – 200 cm (or reasonable limits)
+
+Primary CTA:
+"Save"
+
+Data saved:
+height_value
+height_unit
+
+------------------------------------------------------------
+STEP 2 — WEIGHT
+
+Screen title:
+"Select weight"
+
+Input:
+- Scroll picker (same interaction as height)
+- Units toggle: "kg | lb"
+
+IMPORTANT UX NOTE:
+Use neutral language. Do NOT show BMI or judgement labels.
+
+Primary CTA:
+"Save"
+
+Data saved:
+weight_value
+weight_unit
+
+------------------------------------------------------------
+STEP 3 — FACE SHAPE
+
+Screen title:
+"Select face shape"
+
+Options (visual cards, exactly like reference):
+- Oval
+- Round
+- Square
+- Diamond
+- Heart
+- Rectangle (if included)
+
+Selection:
+- Single select
+- Clearly highlighted when selected
+
+Primary CTA:
+"Save"
+
+Data saved:
+face_shape
+
+------------------------------------------------------------
+STEP 4 — UNDERTONE EDUCATION (NO INPUT YET)
+
+Screen title:
+"Find your undertone"
+
+Content:
+- Educational text explaining undertones
+- Cool / Warm / Neutral explanation
+- Vein test guidance (reference text)
+
+Primary CTA:
+"Continue"
+
+NOTE:
+This step is informational only.
+No data saved here.
+
+------------------------------------------------------------
+STEP 5 — SKIN TONE SELECTION
+
+Screen title:
+"Select skin tone"
+
+Options (as large pill buttons, like reference):
+- Ivory
+- Sand
+- Honey
+- Caramel
+- Bronze
+- Espresso
+
+Behavior:
+- Single select
+- Selected option shows checkmark
+- Clear visual contrast
+
+Buttons:
+- Secondary: "Clear"
+- Primary: "Save"
+
+Data saved:
+skin_tone
+
+------------------------------------------------------------
+STEP 6 — FACE PHOTO (OPTIONAL BUT RECOMMENDED)
+
+Screen title:
+"Upload face picture"
+
+Image upload rules:
+- Front-facing face
+- Good lighting copy shown
+- Accept from camera or gallery
+
+IMPORTANT COPY (non-negotiable):
+"Used only to create your avatar. You can delete this anytime."
+
+Behavior:
+- Show preview after upload
+- Success state: "Photo uploaded successfully!"
+
+Primary CTA:
+"Continue"
+
+Data saved:
+face_photo_url (or reference)
+
+------------------------------------------------------------
+STEP 7 — GENERATING STATE (NO REAL AVATAR YET)
+
+Screen title:
+"Generating your virtual avatar"
+
+Subtext:
+"Please wait a moment while we prepare your avatar.
+Please don’t close this screen."
+
+UI behavior:
+- Loading indicator
+- Use placeholder / blurred image ONLY
+- NO actual avatar generation in this phase
+
+After loading:
+→ Navigate to Profile
+→ Avatar status becomes:
+"Avatar setup complete"
+
+------------------------------------------------------------
+3) DATA MODEL (STORE ONLY, NO PROCESSING)
+
+Store the following fields:
+
+- height_value
+- height_unit
+- weight_value
+- weight_unit
+- face_shape
+- skin_tone
+- undertone (to be inferred later)
+- face_photo_url (optional)
+- avatar_status = "setup_complete"
+
+DO NOT:
+- Infer body type
+- Infer proportions
+- Generate visuals
+- Call any AI model yet
+
+------------------------------------------------------------
+4) USER CONTROL & EDITING
+
+From Profile → My Avatar:
+- Show "Edit avatar details"
+- Allow user to revisit any step
+- Allow deleting face photo independently
+
+------------------------------------------------------------
+5) HARD CONSTRAINTS (DO NOT VIOLATE)
+
+- Do NOT force avatar creation
+- Do NOT require selfie to proceed
+- Do NOT promise photorealism
+- Do NOT show avatar outside Profile yet
+- Do NOT integrate with outfits yet
+
+This phase is DATA FOUNDATION ONLY.
+
+------------------------------------------------------------
+OUTPUT REQUIRED:
+1) Profile entry point added
+2) Multi-step avatar setup flow
+3) Persistent data storage
+4) Editable avatar details state
+
+Stop implementation after this phase.
+Do NOT implement avatar rendering or try-on.
